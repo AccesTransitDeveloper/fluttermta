@@ -974,11 +974,12 @@ class RegisterViewModel extends StateNotifier<RegisterState> {
 
     switch (response) {
       case Success():
-        await _sharedPref.setLoggedIn(true);
-        if (countryCode != null) {
+        final hasNewBearer = response.header?.authorization?.isNotEmpty == true;
+        await _sharedPref.setLoggedIn(hasNewBearer);
+        if (hasNewBearer && countryCode != null) {
           await _fetchEntityDetailAfterSignUp(countryCode);
         }
-        _subscribeMassNotificationTopics();
+        if (hasNewBearer) _subscribeMassNotificationTopics();
         state = state.copyWith(isLoading: false, isSignUpSuccess: true);
         return true;
       case Error():

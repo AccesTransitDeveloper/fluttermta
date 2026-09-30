@@ -10,11 +10,9 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../../../core/managers/permission_manager.dart';
 import '../../../core/router/app_navigation.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../data/repository/app_repository.dart';
 import '../../../models/responses/auth/country_response.dart';
 import '../../../viewmodels/auth/register_viewmodel.dart';
 import '../../../views/widgets/app_scaffold.dart';
-import '../data/ai_driver_document_submission_gateway.dart';
 import '../data/ai_driver_draft_store.dart';
 import '../models/ai_driver_document_draft.dart';
 import '../models/ai_driver_registration_draft.dart';
@@ -565,7 +563,9 @@ class _AtAiDriverScreenState extends State<AtAiDriverScreen>
         content: Text(
           'Name: ${_firstNameController.text} ${_lastNameController.text}\n'
           'TLC number: ${draft.tlcNumber.isEmpty ? 'Not provided' : draft.tlcNumber}\n\n'
-          'Your documents stay on this device and are not uploaded.',
+          'Your documents are saved on this device now. After your Core '
+          'account is created and you are signed in, they will be sent '
+          'to Core for review.',
         ),
         actions: [
           TextButton(
@@ -581,20 +581,6 @@ class _AtAiDriverScreenState extends State<AtAiDriverScreen>
     );
     if (confirmed != true || !mounted) return;
 
-    try {
-      final repository = ProviderScope.containerOf(context, listen: false)
-          .read(appRepositoryProvider);
-      final gateway = AppRepositoryAiDriverDocumentSubmissionGateway(repository);
-      await gateway.submit(draft);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = error is StateError
-            ? error.message
-            : 'The documents could not be sent for review. Please try again.');
-      }
-      return;
-    }
-
     final updated = draft.copyWith(
       firstName: _firstNameController.text,
       lastName: _lastNameController.text,
@@ -605,7 +591,11 @@ class _AtAiDriverScreenState extends State<AtAiDriverScreen>
     await _saveDraft(updated);
     _ssnController.clear();
     await _saveDraft(
-      updated.copyWith(currentStepIndex: 3, completed: false, phase: 'working'),
+      updated.copyWith(
+        currentStepIndex: 3,
+        completed: false,
+        phase: 'awaitingRegistration',
+      ),
     );
     if (mounted) {
       context.navigateToRegisterFromAi(

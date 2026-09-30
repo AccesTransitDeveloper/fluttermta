@@ -20,6 +20,8 @@ import '../../widgets/country_picker_overlay.dart';
 import '../../../models/responses/auth/country_response.dart';
 import '../../../models/webview_data_model.dart';
 import '../../../viewmodels/auth/register_viewmodel.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../features/at_ai_driver/data/pending_ai_driver_documents.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final RegisterOrigin origin;
@@ -275,6 +277,82 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     final latestState = ref.read(registerViewModelProvider);
     if (latestState.isSignUpSuccess && mounted) {
+      final preferences = await ref.read(
+        sharedPreferenceManagerProvider.future,
+      );
+      if (!mounted) return;
+      final entity = preferences.getEntity();
+      final matchesNewAccount = latestState.origin == RegisterOrigin.email
+          ? entity?.email?.trim().toLowerCase() ==
+                latestState.email.trim().toLowerCase()
+          : entity?.phone?.trim() == latestState.phoneNumber.trim();
+      if (!preferences.isLoggedIn() ||
+          preferences.getAuthorization()?.isNotEmpty != true ||
+          entity?.id?.isNotEmpty != true ||
+          !matchesNewAccount) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Core account created'),
+            content: const Text(
+              'Sign in to your new account before sending documents. '
+              'Your AT AI Driver files are saved on this device; open Documents '
+              'after signing in to resume.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Continue to sign in'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) context.navigateToLogin();
+        return;
+      }
+      try {
+        final pending = await PendingAiDriverDocuments.forEntity(entity!);
+        if (pending != null && pending.hasPendingFiles) {
+          await pending.submit(ref.read(appRepositoryProvider), preferences);
+          if (!mounted) return;
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Documents sent to Core'),
+              content: const Text(
+                'Your files were received by Core. Their review is not yet '
+                'complete; check Documents for approval or rejection.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Continue'),
+                ),
+              ],
+            ),
+          );
+        }
+      } catch (error) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Account created; documents need attention'),
+            content: Text(
+              '${error is StateError ? error.message : 'Could not submit your documents.'}\n\n'
+              'Files are saved on this device. Open Documents to review and retry; '
+              'do not register again.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+      }
+      if (!mounted) return;
       context.navigateToHome();
     }
   }

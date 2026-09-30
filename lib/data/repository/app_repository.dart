@@ -197,9 +197,12 @@ class AppRepository {
     );
   }
 
-  Future<ResponseState<DocumentListResponse>> getDocuments() async {
+  Future<ResponseState<DocumentListResponse>> getDocuments({
+    String? authorization,
+  }) async {
     return apiClient.get<DocumentListResponse>(
       ApiEndpoint.getDocuments,
+      headers: authorization == null ? null : {'Authorization': authorization},
       fromJsonT: (json) => DocumentListResponse.fromJson(json),
     );
   }
@@ -734,6 +737,7 @@ class AppRepository {
     String? filePath,
     String? expiryDate,
     String? uniqueCode,
+    String? authorization,
   }) async {
     final path =
         ApiEndpoint.uploadDocument.replaceAll('{documentId}', documentId);
@@ -744,6 +748,7 @@ class AppRepository {
       path,
       filePath: filePath,
       fileFieldName: 'imageUrl',
+      headers: authorization == null ? null : {'Authorization': authorization},
       fields: fields.isNotEmpty ? fields : null,
       fromJsonT: (json) => UploadDocumentResponse.fromJson(json),
     );

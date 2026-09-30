@@ -19,6 +19,7 @@ import '../../../views/widgets/app_text_field.dart';
 import '../../../views/widgets/app_scaffold.dart';
 import '../../../views/widgets/app_text.dart';
 import '../../../views/widgets/app_toolbar.dart';
+import '../../../views/widgets/mta_consent_dialog.dart';
 import '../../bottomsheets/country_phone_code_bottom_sheet.dart';
 import '../../bottomsheets/logout_bottom_sheet.dart';
 
@@ -41,8 +42,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ? ServerConfig.getFullImageUrl(entity.imageUrl)
         : null;
 
-    final fullName =
-        '${entity?.firstName ?? ''} ${entity?.lastName ?? ''}'.trim();
+    final fullName = '${entity?.firstName ?? ''} ${entity?.lastName ?? ''}'
+        .trim();
     final phone = entity?.countryPhoneCode != null && entity?.phone != null
         ? '${entity!.countryPhoneCode} ${entity.phone}'
         : '';
@@ -75,7 +76,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     // Profile
                     _ProfileSection(
                       imageUrl: imageUrl,
-                      fullName: fullName.isNotEmpty ? fullName : getString(appStr.descriptionDriver, 'description_driver'),
+                      fullName: fullName.isNotEmpty
+                          ? fullName
+                          : getString(
+                              appStr.descriptionDriver,
+                              'description_driver',
+                            ),
                       phone: phone,
                       email: email,
                       onTap: () async {
@@ -90,7 +96,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsMenuItem(
                       icon: Icons.dark_mode_outlined,
                       title: getString(
-                          appStr.headingAppearance, 'heading_appearance'),
+                        appStr.headingAppearance,
+                        'heading_appearance',
+                      ),
                       subtitle: state.themeDisplayName,
                       onTap: () =>
                           _showThemeBottomSheet(context, state, viewModel),
@@ -102,12 +110,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsMenuItem(
                       icon: Icons.language_outlined,
                       title: getString(
-                          appStr.descriptionLanguage, 'description_language'),
+                        appStr.descriptionLanguage,
+                        'description_language',
+                      ),
                       subtitle: state.selectedLanguage.isNotEmpty
                           ? state.selectedLanguage
                           : null,
-                      onTap: () =>
-                          _showLanguageBottomSheet(context, viewModel),
+                      onTap: () => _showLanguageBottomSheet(context, viewModel),
                     ),
 
                     const _Divider(),
@@ -115,8 +124,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     // Speaking Language
                     _SettingsMenuItem(
                       icon: Icons.record_voice_over_outlined,
-                      title: getString(appStr.descriptionSpeakingLanguage,
-                          'description_speaking_language'),
+                      title: getString(
+                        appStr.descriptionSpeakingLanguage,
+                        'description_speaking_language',
+                      ),
                       subtitle: state.selectedSpeakingLanguage.isNotEmpty
                           ? state.selectedSpeakingLanguage
                           : null,
@@ -130,7 +141,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _SettingsSwitchItem(
                       icon: Icons.map_outlined,
                       title: getString(
-                          appStr.descriptionHeatMap, 'description_heat_map'),
+                        appStr.descriptionHeatMap,
+                        'description_heat_map',
+                      ),
                       value: state.isHeatMap,
                       onChanged: (_) => viewModel.toggleHeatMap(),
                     ),
@@ -143,8 +156,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle: state.isMtaLoading
                           ? 'Checking MTA connection…'
                           : state.mtaError ??
-                              '${state.isMtaReady ? 'MTA is ready. ' : 'MTA is not currently ready. '}'
-                                  'Offers poll while the app is open; background alerts are best-effort. Acceptance is not broker confirmation, and trip progress/recovery is not available yet.',
+                                '${state.isMtaReady ? 'MTA is ready. ' : 'MTA is not currently ready. '}'
+                                    'Offers poll while the app is open; background alerts are best-effort. Acceptance is not broker confirmation, and trip progress/recovery is not available yet.',
                       value: state.isMtaEnabled,
                       onChanged: state.isMtaLoading
                           ? (_) {}
@@ -153,36 +166,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 await viewModel.setMtaConsent(false);
                                 return;
                               }
-                              final agreed = await showDialog<bool>(
-                                context: context,
-                                builder: (dialogContext) => AlertDialog(
-                                  title: const Text('Enable MTA trip offers?'),
-                                  content: const Text(
-                                    'If you enable MTA, your name, phone number, '
-                                    'selected vehicle details, and sensor '
-                                    'location fixes received while online will '
-                                    'be sent to MTA to provide trip offers. Offers are '
-                                    'polled while the app is active; background '
-                                    'alerts are best-effort only and are not '
-                                    'guaranteed. You can turn this off here at '
-                                    'any time. This is an operational consent '
-                                    'notice, not legal terms.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(dialogContext).pop(false),
-                                      child: const Text('Not now'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(dialogContext).pop(true),
-                                      child: const Text('Enable'),
-                                    ),
-                                  ],
-                                ),
+                              final agreed = await showMtaConsentDialog(
+                                context,
                               );
-                              if (agreed == true) {
+                              if (agreed) {
                                 await viewModel.setMtaConsent(true);
                               }
                             },
@@ -193,12 +180,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     // Navigation Map
                     _SettingsMenuItem(
                       icon: Icons.navigation_outlined,
-                      title: getString(appStr.descriptionNavigationMap,
-                          'description_navigation_map'),
-                      subtitle:
-                          _navigationMapDisplayName(state.navigationMap),
+                      title: getString(
+                        appStr.descriptionNavigationMap,
+                        'description_navigation_map',
+                      ),
+                      subtitle: _navigationMapDisplayName(state.navigationMap),
                       onTap: () => _showNavigationMapBottomSheet(
-                          context, state, viewModel),
+                        context,
+                        state,
+                        viewModel,
+                      ),
                     ),
 
                     const _Divider(),
@@ -206,13 +197,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     // Emergency Contacts
                     _SettingsMenuItem(
                       icon: Icons.emergency_outlined,
-                      title: getString(appStr.headingEmergencyContacts,
-                          'heading_emergency_contacts'),
+                      title: getString(
+                        appStr.headingEmergencyContacts,
+                        'heading_emergency_contacts',
+                      ),
                       subtitle: state.emergencyContacts.isNotEmpty
                           ? '${state.emergencyContacts.length} contact${state.emergencyContacts.length == 1 ? '' : 's'}'
                           : null,
-                      onTap: () => _showEmergencyContactsBottomSheet(
-                          context, viewModel),
+                      onTap: () =>
+                          _showEmergencyContactsBottomSheet(context, viewModel),
                     ),
 
                     const _Divider(),
@@ -227,8 +220,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onDeleteAddress: (address) =>
                           viewModel.deleteAddress(address),
                       onAddAddress: () async {
-                        final result =
-                            await context.navigateToSelectLocation();
+                        final result = await context.navigateToSelectLocation();
                         if (result != null) {
                           viewModel.addAddress(result);
                         }
@@ -240,19 +232,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     // Delete Account
                     _SettingsMenuItem(
                       icon: Icons.delete_outline,
-                      title: getString(appStr.headingDeleteAccount,
-                          'heading_delete_account'),
+                      title: getString(
+                        appStr.headingDeleteAccount,
+                        'heading_delete_account',
+                      ),
                       onTap: () => _showDeleteAccountBottomSheet(
-                          context, state, viewModel),
+                        context,
+                        state,
+                        viewModel,
+                      ),
                     ),
 
                     // Logout
                     _SettingsMenuItem(
                       icon: Icons.exit_to_app,
-                      title: getString(
-                          appStr.headingLogout, 'heading_logout'),
-                      onTap: () =>
-                          _showLogoutBottomSheet(context, viewModel),
+                      title: getString(appStr.headingLogout, 'heading_logout'),
+                      onTap: () => _showLogoutBottomSheet(context, viewModel),
                     ),
 
                     const SizedBox(height: AppDimens.paddingXL),
@@ -279,14 +274,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _navigationMapDisplayName(String value) {
     switch (value) {
       case NavigationMapType.google:
-        return getString(
-            appStr.descriptionGoogleMap, 'description_google_map');
+        return getString(appStr.descriptionGoogleMap, 'description_google_map');
       case NavigationMapType.waze:
-        return getString(
-            appStr.descriptionWazeMap, 'description_waze_map');
+        return getString(appStr.descriptionWazeMap, 'description_waze_map');
       default:
         return getString(
-            appStr.descriptionInAppGoogle, 'description_in_app_google');
+          appStr.descriptionInAppGoogle,
+          'description_in_app_google',
+        );
     }
   }
 
@@ -314,12 +309,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppText.title(getString(
-                  appStr.descriptionSelectTheme, 'description_select_theme')),
+              AppText.title(
+                getString(
+                  appStr.descriptionSelectTheme,
+                  'description_select_theme',
+                ),
+              ),
               const SizedBox(height: AppDimens.padding),
               _SelectionOption(
                 title: getString(
-                    appStr.descriptionLightMode, 'description_light_mode'),
+                  appStr.descriptionLightMode,
+                  'description_light_mode',
+                ),
                 isSelected: state.selectedTheme == AppThemeMode.light,
                 onTap: () {
                   viewModel.setTheme(AppThemeMode.light);
@@ -329,7 +330,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _SelectionOption(
                 title: getString(
-                    appStr.descriptionDarkMode, 'description_dark_mode'),
+                  appStr.descriptionDarkMode,
+                  'description_dark_mode',
+                ),
                 isSelected: state.selectedTheme == AppThemeMode.dark,
                 onTap: () {
                   viewModel.setTheme(AppThemeMode.dark);
@@ -338,8 +341,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 },
               ),
               _SelectionOption(
-                title: getString(appStr.descriptionSystemDefault,
-                    'description_system_default'),
+                title: getString(
+                  appStr.descriptionSystemDefault,
+                  'description_system_default',
+                ),
                 isSelected: state.selectedTheme == AppThemeMode.system,
                 onTap: () {
                   viewModel.setTheme(AppThemeMode.system);
@@ -383,27 +388,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(AppDimens.padding),
-                    child: AppText.title(getString(appStr.headingSelectLanguage,
-                        'heading_select_language')),
+                    child: AppText.title(
+                      getString(
+                        appStr.headingSelectLanguage,
+                        'heading_select_language',
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: ListView(
                       controller: scrollController,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.padding),
+                        horizontal: AppDimens.padding,
+                      ),
                       children: [
-                        ...currentState.languageList
-                            .asMap()
-                            .entries
-                            .map((entry) => _SelectionOption(
-                                  title: entry.value.name,
-                                  isSelected: entry.value.isSelected,
-                                  onTap: () {
-                                    viewModel.selectLanguage(entry.key);
-                                    viewModel.applyLanguage();
-                                    context.goBack();
-                                  },
-                                )),
+                        ...currentState.languageList.asMap().entries.map(
+                          (entry) => _SelectionOption(
+                            title: entry.value.name,
+                            isSelected: entry.value.isSelected,
+                            onTap: () {
+                              viewModel.selectLanguage(entry.key);
+                              viewModel.applyLanguage();
+                              context.goBack();
+                            },
+                          ),
+                        ),
                         const SizedBox(height: AppDimens.paddingS),
                       ],
                     ),
@@ -445,25 +454,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(AppDimens.padding),
-                    child: AppText.title(getString(
+                    child: AppText.title(
+                      getString(
                         appStr.descriptionSelectVerbalLanguage,
-                        'description_select_verbal_language')),
+                        'description_select_verbal_language',
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: ListView(
                       controller: scrollController,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.padding),
+                        horizontal: AppDimens.padding,
+                      ),
                       children: [
                         ...currentState.speakingLanguageList
                             .asMap()
                             .entries
-                            .map((entry) => _SelectionOption(
-                                  title: entry.value.name,
-                                  isSelected: entry.value.isSelected,
-                                  onTap: () => viewModel
-                                      .selectSpeakingLanguage(entry.key),
-                                )),
+                            .map(
+                              (entry) => _SelectionOption(
+                                title: entry.value.name,
+                                isSelected: entry.value.isSelected,
+                                onTap: () =>
+                                    viewModel.selectSpeakingLanguage(entry.key),
+                              ),
+                            ),
                         const SizedBox(height: AppDimens.paddingS),
                       ],
                     ),
@@ -511,13 +526,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppText.title(getString(appStr.descriptionNavigationMap,
-                  'description_navigation_map')),
+              AppText.title(
+                getString(
+                  appStr.descriptionNavigationMap,
+                  'description_navigation_map',
+                ),
+              ),
               const SizedBox(height: AppDimens.padding),
               _SelectionOption(
                 title: getString(
-                    appStr.descriptionInAppGoogle, 'description_in_app_google'),
-                isSelected: state.navigationMap.isEmpty ||
+                  appStr.descriptionInAppGoogle,
+                  'description_in_app_google',
+                ),
+                isSelected:
+                    state.navigationMap.isEmpty ||
                     state.navigationMap == NavigationMapType.inAppGoogle,
                 onTap: () {
                   viewModel.setNavigationMap(NavigationMapType.inAppGoogle);
@@ -526,9 +548,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _SelectionOption(
                 title: getString(
-                    appStr.descriptionGoogleMap, 'description_google_map'),
-                isSelected:
-                    state.navigationMap == NavigationMapType.google,
+                  appStr.descriptionGoogleMap,
+                  'description_google_map',
+                ),
+                isSelected: state.navigationMap == NavigationMapType.google,
                 onTap: () {
                   viewModel.setNavigationMap(NavigationMapType.google);
                   context.goBack();
@@ -536,7 +559,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _SelectionOption(
                 title: getString(
-                    appStr.descriptionWazeMap, 'description_waze_map'),
+                  appStr.descriptionWazeMap,
+                  'description_waze_map',
+                ),
                 isSelected: state.navigationMap == NavigationMapType.waze,
                 onTap: () {
                   viewModel.setNavigationMap(NavigationMapType.waze);
@@ -580,82 +605,94 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             builder: (context, scrollController) => SafeArea(
               top: false,
               child: Padding(
-              padding: const EdgeInsets.all(AppDimens.padding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      AppText.title(getString(appStr.headingEmergencyContacts,
-                          'heading_emergency_contacts')),
-                      IconButton(
-                        icon:
-                            Icon(Icons.add, color: colors.colorPrimary),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          viewModel.showAddContactSheet();
-                          _showAddEditContactBottomSheet(screenContext, viewModel);
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppDimens.paddingS),
-
-                  // Body
-                  if (currentState.isContactLoading)
-                    const Expanded(
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (contacts.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.contact_phone_outlined,
-                                size: 48,
-                                color: colors.colorTextHint),
-                            const SizedBox(height: AppDimens.paddingM),
-                            AppText.body(
-                              getString(
-                                  appStr.descriptionNoEmergencyContacts,
-                                  'description_no_emergency_contacts'),
-                              color: colors.colorTextHint,
-                            ),
-                          ],
+                padding: const EdgeInsets.all(AppDimens.padding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        AppText.title(
+                          getString(
+                            appStr.headingEmergencyContacts,
+                            'heading_emergency_contacts',
+                          ),
                         ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.separated(
-                        controller: scrollController,
-                        itemCount: contacts.length,
-                        separatorBuilder: (_, _) => Divider(
-                          height: 1,
-                          color: colors.colorBackgroundGray,
+                        IconButton(
+                          icon: Icon(Icons.add, color: colors.colorPrimary),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            viewModel.showAddContactSheet();
+                            _showAddEditContactBottomSheet(
+                              screenContext,
+                              viewModel,
+                            );
+                          },
                         ),
-                        itemBuilder: (context, index) {
-                          final contact = contacts[index];
-                          return _EmergencyContactTile(
-                            contact: contact,
-                            onEdit: () {
-                              viewModel.showAddContactSheet(contact: contact);
-                              _showAddEditContactBottomSheet(screenContext, viewModel);
-                            },
-                            onDelete: () =>
-                                viewModel.deleteEmergencyContact(index),
-                          );
-                        },
-                      ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: AppDimens.paddingS),
+
+                    // Body
+                    if (currentState.isContactLoading)
+                      const Expanded(
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (contacts.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.contact_phone_outlined,
+                                size: 48,
+                                color: colors.colorTextHint,
+                              ),
+                              const SizedBox(height: AppDimens.paddingM),
+                              AppText.body(
+                                getString(
+                                  appStr.descriptionNoEmergencyContacts,
+                                  'description_no_emergency_contacts',
+                                ),
+                                color: colors.colorTextHint,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.separated(
+                          controller: scrollController,
+                          itemCount: contacts.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            color: colors.colorBackgroundGray,
+                          ),
+                          itemBuilder: (context, index) {
+                            final contact = contacts[index];
+                            return _EmergencyContactTile(
+                              contact: contact,
+                              onEdit: () {
+                                viewModel.showAddContactSheet(contact: contact);
+                                _showAddEditContactBottomSheet(
+                                  screenContext,
+                                  viewModel,
+                                );
+                              },
+                              onDelete: () =>
+                                  viewModel.deleteEmergencyContact(index),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
           );
         },
       ),
@@ -695,7 +732,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       sorted: true,
     );
 
-    final contactsWithPhone = contacts.where((c) => c.phones.isNotEmpty).toList();
+    final contactsWithPhone = contacts
+        .where((c) => c.phones.isNotEmpty)
+        .toList();
     if (contactsWithPhone.isEmpty || !mounted) return null;
 
     final selected = await showModalBottomSheet<Contact>(
@@ -710,7 +749,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (selected != null) {
       final name = selected.displayName;
-      final phone = selected.phones.first.number.replaceAll(RegExp(r'[^\d]'), '');
+      final phone = selected.phones.first.number.replaceAll(
+        RegExp(r'[^\d]'),
+        '',
+      );
       return (name: name, phone: phone);
     }
     return null;
@@ -739,12 +781,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppText.title(getString(
-                  appStr.headingDeleteAccount, 'heading_delete_account')),
+              AppText.title(
+                getString(
+                  appStr.headingDeleteAccount,
+                  'heading_delete_account',
+                ),
+              ),
               const SizedBox(height: AppDimens.paddingS),
               AppText.body(
-                getString(appStr.descriptionDeleteAccount,
-                    'description_delete_account'),
+                getString(
+                  appStr.descriptionDeleteAccount,
+                  'description_delete_account',
+                ),
                 color: colors.colorText,
               ),
               const SizedBox(height: AppDimens.paddingXL),
@@ -752,8 +800,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Expanded(
                     child: AppOutlinedButton(
-                      text: getString(
-                          appStr.buttonCancel, 'button_cancel'),
+                      text: getString(appStr.buttonCancel, 'button_cancel'),
                       onPressed: () => context.goBack(),
                     ),
                   ),
@@ -764,15 +811,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         final s = ref.watch(settingsViewModelProvider);
                         return AppFilledButton(
                           text: getString(
-                              appStr.descriptionDelete, 'description_delete'),
+                            appStr.descriptionDelete,
+                            'description_delete',
+                          ),
                           onPressed: s.isDeleteLoading
                               ? null
                               : () {
                                   viewModel.confirmDeleteAccount();
-                                  final currentState = ref.read(settingsViewModelProvider);
+                                  final currentState = ref.read(
+                                    settingsViewModelProvider,
+                                  );
                                   context.goBack();
-                                  if (currentState.deleteStep == DeleteStep.authOptions) {
-                                    _showAuthenticationOptionsSheet(this.context, viewModel);
+                                  if (currentState.deleteStep ==
+                                      DeleteStep.authOptions) {
+                                    _showAuthenticationOptionsSheet(
+                                      this.context,
+                                      viewModel,
+                                    );
                                   }
                                 },
                           isLoading: s.isDeleteLoading,
@@ -814,12 +869,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppText.title(getString(
-                      appStr.headingVerifyIdentity, 'heading_verify_identity')),
+                  AppText.title(
+                    getString(
+                      appStr.headingVerifyIdentity,
+                      'heading_verify_identity',
+                    ),
+                  ),
                   const SizedBox(height: AppDimens.paddingS),
                   AppText.body(
-                    getString(appStr.descriptionSelectVerificationMethod,
-                        'description_select_verification_method'),
+                    getString(
+                      appStr.descriptionSelectVerificationMethod,
+                      'description_select_verification_method',
+                    ),
                     color: colors.colorText,
                   ),
                   const SizedBox(height: AppDimens.paddingM),
@@ -827,15 +888,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     final index = entry.key;
                     final option = entry.value;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: AppDimens.paddingS),
+                      padding: const EdgeInsets.only(
+                        bottom: AppDimens.paddingS,
+                      ),
                       child: InkWell(
-                        onTap: () => viewModel.selectAuthenticationOption(index),
-                        borderRadius: BorderRadius.circular(AppDimens.buttonRadius),
+                        onTap: () =>
+                            viewModel.selectAuthenticationOption(index),
+                        borderRadius: BorderRadius.circular(
+                          AppDimens.buttonRadius,
+                        ),
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(AppDimens.paddingM),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(AppDimens.buttonRadius),
+                            borderRadius: BorderRadius.circular(
+                              AppDimens.buttonRadius,
+                            ),
                             border: Border.all(
                               color: option.isSelected
                                   ? colors.colorPrimary
@@ -855,9 +923,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 size: 20,
                               ),
                               const SizedBox(width: AppDimens.paddingM),
-                              Expanded(
-                                child: AppText.body(option.name),
-                              ),
+                              Expanded(child: AppText.body(option.name)),
                             ],
                           ),
                         ),
@@ -879,19 +945,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const SizedBox(width: AppDimens.paddingM),
                       Expanded(
                         child: AppFilledButton(
-                          text: getString(appStr.buttonConfirm, 'button_confirm'),
+                          text: getString(
+                            appStr.buttonConfirm,
+                            'button_confirm',
+                          ),
                           isLoading: s.isDeleteLoading,
                           onPressed: s.isDeleteLoading
                               ? null
                               : () {
                                   viewModel.confirmAuthenticationOption();
-                                  final currentState = ref.read(settingsViewModelProvider);
-                                  if (currentState.deleteStep == DeleteStep.password) {
+                                  final currentState = ref.read(
+                                    settingsViewModelProvider,
+                                  );
+                                  if (currentState.deleteStep ==
+                                      DeleteStep.password) {
                                     sheetContext.goBack();
-                                    _showVerifyPasswordSheet(this.context, viewModel);
-                                  } else if (currentState.deleteStep == DeleteStep.otp) {
+                                    _showVerifyPasswordSheet(
+                                      this.context,
+                                      viewModel,
+                                    );
+                                  } else if (currentState.deleteStep ==
+                                      DeleteStep.otp) {
                                     sheetContext.goBack();
-                                    _showVerifyOtpSheet(this.context, viewModel);
+                                    _showVerifyOtpSheet(
+                                      this.context,
+                                      viewModel,
+                                    );
                                   }
                                 },
                         ),
@@ -934,7 +1013,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             left: AppDimens.padding,
             right: AppDimens.padding,
             top: AppDimens.padding,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + AppDimens.padding,
+            bottom:
+                MediaQuery.of(sheetContext).viewInsets.bottom +
+                AppDimens.padding,
           ),
           child: Consumer(
             builder: (context, ref, child) {
@@ -944,19 +1025,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText.title(getString(
-                        appStr.headingVerifyPassword, 'heading_verify_password')),
+                    AppText.title(
+                      getString(
+                        appStr.headingVerifyPassword,
+                        'heading_verify_password',
+                      ),
+                    ),
                     const SizedBox(height: AppDimens.paddingS),
                     AppText.body(
-                      getString(appStr.descriptionEnterPasswordToDelete,
-                          'description_enter_password_to_delete'),
+                      getString(
+                        appStr.descriptionEnterPasswordToDelete,
+                        'description_enter_password_to_delete',
+                      ),
                       color: colors.colorText,
                     ),
                     const SizedBox(height: AppDimens.paddingM),
                     AppTextField(
                       controller: passwordController,
                       hintText: getString(
-                          appStr.hintEnterPassword, 'hint_enter_password'),
+                        appStr.hintEnterPassword,
+                        'hint_enter_password',
+                      ),
                       obscureText: true,
                       onChanged: viewModel.updateDeletePassword,
                     ),
@@ -965,7 +1054,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Expanded(
                           child: AppOutlinedButton(
-                            text: getString(appStr.buttonCancel, 'button_cancel'),
+                            text: getString(
+                              appStr.buttonCancel,
+                              'button_cancel',
+                            ),
                             onPressed: () {
                               viewModel.resetDeleteState();
                               sheetContext.goBack();
@@ -976,7 +1068,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Expanded(
                           child: AppFilledButton(
                             text: getString(
-                                appStr.descriptionDelete, 'description_delete'),
+                              appStr.descriptionDelete,
+                              'description_delete',
+                            ),
                             isLoading: s.isDeleteLoading,
                             backgroundColor: colors.colorWarning,
                             onPressed: s.isDeleteLoading
@@ -1002,10 +1096,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
-  void _showVerifyOtpSheet(
-    BuildContext context,
-    SettingsViewModel viewModel,
-  ) {
+  void _showVerifyOtpSheet(BuildContext context, SettingsViewModel viewModel) {
     final colors = context.colors;
     final otpController = TextEditingController();
 
@@ -1022,7 +1113,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             left: AppDimens.padding,
             right: AppDimens.padding,
             top: AppDimens.padding,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + AppDimens.padding,
+            bottom:
+                MediaQuery.of(sheetContext).viewInsets.bottom +
+                AppDimens.padding,
           ),
           child: Consumer(
             builder: (context, ref, child) {
@@ -1032,19 +1125,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText.title(getString(
-                        appStr.headingVerifyOtp, 'heading_verify_otp')),
+                    AppText.title(
+                      getString(appStr.headingVerifyOtp, 'heading_verify_otp'),
+                    ),
                     const SizedBox(height: AppDimens.paddingS),
                     AppText.body(
-                      getString(appStr.descriptionOtpSentTo, 'description_otp_sent_to')
-                          .replacePlaceholders({StringConstant.param: s.otpSendTo}),
+                      getString(
+                        appStr.descriptionOtpSentTo,
+                        'description_otp_sent_to',
+                      ).replacePlaceholders({
+                        StringConstant.param: s.otpSendTo,
+                      }),
                       color: colors.colorText,
                     ),
                     const SizedBox(height: AppDimens.paddingM),
                     AppTextField(
                       controller: otpController,
                       hintText: getString(
-                          appStr.hintEnterOtp, 'hint_enter_otp'),
+                        appStr.hintEnterOtp,
+                        'hint_enter_otp',
+                      ),
                       keyboardType: TextInputType.number,
                       onChanged: viewModel.updateDeleteOtp,
                     ),
@@ -1059,7 +1159,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           : GestureDetector(
                               onTap: viewModel.resendDeleteOtp,
                               child: AppText.caption(
-                                getString(appStr.buttonResendOtp, 'button_resend_otp'),
+                                getString(
+                                  appStr.buttonResendOtp,
+                                  'button_resend_otp',
+                                ),
                                 color: colors.colorPrimary,
                               ),
                             ),
@@ -1069,7 +1172,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Expanded(
                           child: AppOutlinedButton(
-                            text: getString(appStr.buttonCancel, 'button_cancel'),
+                            text: getString(
+                              appStr.buttonCancel,
+                              'button_cancel',
+                            ),
                             onPressed: () {
                               viewModel.resetDeleteState();
                               sheetContext.goBack();
@@ -1079,7 +1185,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const SizedBox(width: AppDimens.paddingM),
                         Expanded(
                           child: AppFilledButton(
-                            text: getString(appStr.buttonVerify, 'button_verify'),
+                            text: getString(
+                              appStr.buttonVerify,
+                              'button_verify',
+                            ),
                             isLoading: s.isDeleteLoading,
                             onPressed: s.isDeleteLoading
                                 ? null
@@ -1168,7 +1277,6 @@ class _AddContactSheetContentState
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -1194,7 +1302,9 @@ class _AddContactSheetContentState
           onPhoneCodeSelected: (country) {
             widget.viewModel.updateContactCountryPhoneCode(country);
           },
-        ).then((_) => widget.viewModel.dismissContactCountryPhoneCodeBottomSheet());
+        ).then(
+          (_) => widget.viewModel.dismissContactCountryPhoneCodeBottomSheet(),
+        );
       }
     });
 
@@ -1202,19 +1312,26 @@ class _AddContactSheetContentState
     if (_nameController.text != currentState.contactName) {
       _nameController.value = TextEditingValue(
         text: currentState.contactName,
-        selection: TextSelection.collapsed(offset: currentState.contactName.length),
+        selection: TextSelection.collapsed(
+          offset: currentState.contactName.length,
+        ),
       );
     }
     if (_phoneController.text != currentState.contactPhone) {
       _phoneController.value = TextEditingValue(
         text: currentState.contactPhone,
-        selection: TextSelection.collapsed(offset: currentState.contactPhone.length),
+        selection: TextSelection.collapsed(
+          offset: currentState.contactPhone.length,
+        ),
       );
     }
 
     final title = isEditing
         ? getString(null, 'heading_update_emergency_contact')
-        : getString(appStr.headingAddEmergencyContact, 'heading_add_emergency_contact');
+        : getString(
+            appStr.headingAddEmergencyContact,
+            'heading_add_emergency_contact',
+          );
 
     return SafeArea(
       top: false,
@@ -1237,7 +1354,9 @@ class _AddContactSheetContentState
               AppTextField(
                 controller: _nameController,
                 hintText: getString(
-                    appStr.descriptionProfileName, 'description_profile_name'),
+                  appStr.descriptionProfileName,
+                  'description_profile_name',
+                ),
                 textInputAction: TextInputAction.next,
                 keyboardType: TextInputType.name,
                 onChanged: widget.viewModel.updateContactName,
@@ -1250,7 +1369,8 @@ class _AddContactSheetContentState
                 children: [
                   GestureDetector(
                     onTap: () {
-                      widget.viewModel.toggleContactCountryPhoneCodeBottomSheet();
+                      widget.viewModel
+                          .toggleContactCountryPhoneCodeBottomSheet();
                     },
                     child: Container(
                       height: 56,
@@ -1259,7 +1379,9 @@ class _AddContactSheetContentState
                       ),
                       decoration: BoxDecoration(
                         color: colors.colorBackgroundGray,
-                        borderRadius: BorderRadius.circular(AppDimens.buttonRadiusSmall),
+                        borderRadius: BorderRadius.circular(
+                          AppDimens.buttonRadiusSmall,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1288,7 +1410,10 @@ class _AddContactSheetContentState
                   Expanded(
                     child: AppTextField(
                       controller: _phoneController,
-                      hintText: getString(appStr.descriptionPhone, 'description_phone'),
+                      hintText: getString(
+                        appStr.descriptionPhone,
+                        'description_phone',
+                      ),
                       textInputAction: TextInputAction.done,
                       keyboardType: TextInputType.phone,
                       onChanged: widget.viewModel.updateContactPhone,
@@ -1320,7 +1445,10 @@ class _AddContactSheetContentState
                 child: AppFilledButton(
                   text: isEditing
                       ? getString(appStr.buttonUpdate, 'button_update')
-                      : getString(appStr.buttonAddContact, 'button_add_contact'),
+                      : getString(
+                          appStr.buttonAddContact,
+                          'button_add_contact',
+                        ),
                   isLoading: currentState.isContactLoading,
                   onPressed: currentState.isContactLoading
                       ? null
@@ -1354,15 +1482,17 @@ class _EmergencyContactTile extends StatelessWidget {
     final colors = context.colors;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(vertical: AppDimens.paddingS),
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.paddingS),
       child: Row(
         children: [
           CircleAvatar(
             radius: 20,
             backgroundColor: colors.colorBackgroundGray,
-            child: Icon(Icons.person_outline,
-                color: colors.colorText, size: 20),
+            child: Icon(
+              Icons.person_outline,
+              color: colors.colorText,
+              size: 20,
+            ),
           ),
           const SizedBox(width: AppDimens.paddingM),
           Expanded(
@@ -1381,15 +1511,21 @@ class _EmergencyContactTile extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.edit_outlined,
-                size: 20, color: colors.colorPrimary),
+            icon: Icon(
+              Icons.edit_outlined,
+              size: 20,
+              color: colors.colorPrimary,
+            ),
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(AppDimens.paddingS),
             onPressed: onEdit,
           ),
           IconButton(
-            icon: Icon(Icons.delete_outline,
-                size: 20, color: colors.colorWarning),
+            icon: Icon(
+              Icons.delete_outline,
+              size: 20,
+              color: colors.colorWarning,
+            ),
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(AppDimens.paddingS),
             onPressed: onDelete,
@@ -1432,8 +1568,11 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
       _filteredContacts = query.isEmpty
           ? widget.contacts
           : widget.contacts
-              .where((c) => c.displayName.toLowerCase().contains(query.toLowerCase()))
-              .toList();
+                .where(
+                  (c) =>
+                      c.displayName.toLowerCase().contains(query.toLowerCase()),
+                )
+                .toList();
     });
   }
 
@@ -1470,7 +1609,11 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundColor: colors.colorBackgroundGray,
-                        child: Icon(Icons.person, color: colors.colorText, size: 20),
+                        child: Icon(
+                          Icons.person,
+                          color: colors.colorText,
+                          size: 20,
+                        ),
                       ),
                       title: AppText.body(contact.displayName),
                       subtitle: phone.isNotEmpty
@@ -1520,22 +1663,28 @@ class _GoingHomeSection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.home_outlined,
-                  color: colors.colorText, size: AppDimens.iconSize),
+              Icon(
+                Icons.home_outlined,
+                color: colors.colorText,
+                size: AppDimens.iconSize,
+              ),
               const SizedBox(width: AppDimens.padding),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AppText.body(
-                      getString(appStr.descriptionSettingsGoingHome,
-                          'description_settings_going_home'),
+                      getString(
+                        appStr.descriptionSettingsGoingHome,
+                        'description_settings_going_home',
+                      ),
                       fontWeight: FontWeight.w500,
                     ),
                     AppText.caption(
                       getString(
-                          appStr.descriptionSettingsGoingHomeDescription,
-                          'description_settings_going_home_description'),
+                        appStr.descriptionSettingsGoingHomeDescription,
+                        'description_settings_going_home_description',
+                      ),
                       color: colors.colorText,
                     ),
                   ],
@@ -1557,22 +1706,29 @@ class _GoingHomeSection extends StatelessWidget {
           ),
           if (addressList.isNotEmpty) ...[
             const SizedBox(height: AppDimens.paddingS),
-            ...addressList.map((addr) => _AddressTile(
-                  address: addr,
-                  onDelete: () => onDeleteAddress(addr),
-                )),
+            ...addressList.map(
+              (addr) => _AddressTile(
+                address: addr,
+                onDelete: () => onDeleteAddress(addr),
+              ),
+            ),
           ],
           const SizedBox(height: AppDimens.paddingM),
           GestureDetector(
             onTap: onAddAddress,
             child: Row(
               children: [
-                Icon(Icons.add_location_alt_outlined,
-                    size: AppDimens.iconSizeSmall, color: colors.colorPrimary),
+                Icon(
+                  Icons.add_location_alt_outlined,
+                  size: AppDimens.iconSizeSmall,
+                  color: colors.colorPrimary,
+                ),
                 const SizedBox(width: AppDimens.paddingS),
                 AppText.body(
                   getString(
-                      appStr.descriptionAddAddress, 'description_add_address'),
+                    appStr.descriptionAddAddress,
+                    'description_add_address',
+                  ),
                   color: colors.colorPrimary,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1600,13 +1756,9 @@ class _AddressTile extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            address.isSelected
-                ? Icons.location_on
-                : Icons.location_on_outlined,
+            address.isSelected ? Icons.location_on : Icons.location_on_outlined,
             size: AppDimens.iconSizeSmall,
-            color: address.isSelected
-                ? colors.colorPrimary
-                : colors.colorText,
+            color: address.isSelected ? colors.colorPrimary : colors.colorText,
           ),
           const SizedBox(width: AppDimens.paddingM),
           Expanded(
@@ -1615,15 +1767,17 @@ class _AddressTile extends StatelessWidget {
               children: [
                 if (address.title.isNotEmpty &&
                     address.title != address.address)
-                  AppText.body(address.title,
-                      fontWeight: FontWeight.w500),
+                  AppText.body(address.title, fontWeight: FontWeight.w500),
                 AppText.caption(address.address, color: colors.colorText),
               ],
             ),
           ),
           IconButton(
-            icon: Icon(Icons.delete_outline,
-                size: AppDimens.iconSizeSmall, color: colors.colorWarning),
+            icon: Icon(
+              Icons.delete_outline,
+              size: AppDimens.iconSizeSmall,
+              color: colors.colorWarning,
+            ),
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(AppDimens.paddingS),
             onPressed: onDelete,
@@ -1664,29 +1818,24 @@ class _ProfileSection extends StatelessWidget {
             if (imageUrl != null)
               CachedNetworkImage(
                 imageUrl: imageUrl!,
-                imageBuilder: (context, imageProvider) => CircleAvatar(
-                  radius: 32,
-                  backgroundImage: imageProvider,
-                ),
+                imageBuilder: (context, imageProvider) =>
+                    CircleAvatar(radius: 32, backgroundImage: imageProvider),
                 placeholder: (context, url) => CircleAvatar(
                   radius: 32,
                   backgroundColor: colors.colorBackgroundGray,
-                  child: Icon(Icons.person,
-                      size: 32, color: colors.colorText),
+                  child: Icon(Icons.person, size: 32, color: colors.colorText),
                 ),
                 errorWidget: (context, url, error) => CircleAvatar(
                   radius: 32,
                   backgroundColor: colors.colorBackgroundGray,
-                  child: Icon(Icons.person,
-                      size: 32, color: colors.colorText),
+                  child: Icon(Icons.person, size: 32, color: colors.colorText),
                 ),
               )
             else
               CircleAvatar(
                 radius: 32,
                 backgroundColor: colors.colorBackgroundGray,
-                child: Icon(Icons.person,
-                    size: 32, color: colors.colorText),
+                child: Icon(Icons.person, size: 32, color: colors.colorText),
               ),
             const SizedBox(width: AppDimens.padding),
             Expanded(
@@ -1801,10 +1950,7 @@ class _SettingsSwitchItem extends StatelessWidget {
                 AppText.body(title, fontWeight: FontWeight.w500),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
-                  AppText.caption(
-                    subtitle!,
-                    color: colors.colorTextHint,
-                  ),
+                  AppText.caption(subtitle!, color: colors.colorTextHint),
                 ],
               ],
             ),
@@ -1851,8 +1997,7 @@ class _SelectionOption extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(vertical: AppDimens.paddingM),
+        padding: const EdgeInsets.symmetric(vertical: AppDimens.paddingM),
         child: Row(
           children: [
             Expanded(child: AppText.body(title)),

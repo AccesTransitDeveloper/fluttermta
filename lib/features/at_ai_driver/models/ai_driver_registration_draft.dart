@@ -188,7 +188,7 @@ class AiDriverRegistrationDraft {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'completed': completed,
-    'submissionStatus': 'notSubmitted',
+    'submissionStatus': phase == 'submitted' ? 'submitted' : 'notSubmitted',
     'networkDestination': null,
     'documents': documents.map((item) => item.toJson()).toList(),
     'firstName': firstName,

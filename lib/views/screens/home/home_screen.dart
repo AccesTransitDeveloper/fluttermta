@@ -15,6 +15,10 @@ import '../../../core/utils/snackbar_utils.dart';
 import '../../../data/api/response_state.dart';
 import '../../../data/api/server_config.dart';
 import '../../../data/api/mta_api.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../models/responses/home/information_status_response.dart';
+import '../../../viewmodels/settings_viewmodel.dart';
+import '../../widgets/mta_consent_dialog.dart';
 import '../../../models/missing_info_item.dart';
 import '../../../models/responses/home/additional_terms_item.dart';
 import '../../../models/responses/home/assessment_config.dart';
@@ -41,6 +45,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late final MapInterface _mapManager;
   late final AnimationController _pulseController;
   bool _subscriptionSheetShowing = false;
+  bool _mtaInvitationInProgress = false;
+
   /// Whether the map has already been centred on the driver for this screen.
   bool _didAutoZoom = false;
   static const double _defaultZoom = 16;
@@ -62,6 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // in which case the listener below won't fire.
       _autoZoomToDriver(state);
       _requestPermissions();
+      _maybeOfferMtaAfterApproval();
     });
   }
 
@@ -92,6 +99,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final viewModel = ref.read(homeViewModelProvider.notifier);
     viewModel.getEntityDetail();
     viewModel.resumeMtaPolling();
+    _maybeOfferMtaAfterApproval();
   }
 
   @override
@@ -104,7 +112,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
       if (isCurrent) {
         homeViewModel.getEntityDetail();
+        _maybeOfferMtaAfterApproval();
       }
+    }
+  }
+
+  Future<void> _maybeOfferMtaAfterApproval() async {
+    if (_mtaInvitationInProgress) return;
+    _mtaInvitationInProgress = true;
+    try {
+      final preferences = await ref.read(
+        sharedPreferenceManagerProvider.future,
+      );
+      final entity = preferences.getEntity();
+      if (!preferences.isLoggedIn() ||
+          preferences.getAuthorization()?.isNotEmpty != true ||
+          entity?.id?.isNotEmpty != true ||
+          preferences.hasSeenMtaInvitation(entity!.id!, MtaApi.termsVersion)) {
+        return;
+      }
+
+      // Always use Core's current approval state, not an old cached entity.
+      final response = await ref
+          .read(appRepositoryProvider)
+          .getInformationStatus();
+      if (response is! Success<InformationStatusResponse>) return;
+      final status = response.data?.informationStatus;
+      if (status?.documentStatus != 30 ||
+          status?.vehicleDocumentStatus != 30 ||
+          status?.vehicleApprovalStatus != VehicleStatus.approved ||
+          status?.profileStatus != true ||
+          status?.countryStatus != true ||
+          status?.cityStatus != true ||
+          status?.vehicleStatus != true ||
+          !const {
+            EntityStatus.approve,
+            EntityStatus.offline,
+            EntityStatus.available,
+            EntityStatus.inBooking,
+            EntityStatus.availableForShare,
+            EntityStatus.nearAvailable,
+          }.contains(entity!.status)) {
+        return;
+      }
+      final mta = await ref.read(mtaApiProvider).getStatus();
+      if (mta.mtaEnabled ||
+          !mounted ||
+          ModalRoute.of(context)?.isCurrent != true)
+        return;
+
+      final agreed = await showMtaConsentDialog(context);
+      await preferences.markMtaInvitationSeen(entity!.id!, MtaApi.termsVersion);
+      if (!agreed || !mounted) return;
+      final settings = ref.read(settingsViewModelProvider.notifier);
+      await settings.refreshMtaStatus();
+      if (!mounted) return;
+      await settings.setMtaConsent(true);
+      if (mounted && !ref.read(settingsViewModelProvider).isMtaEnabled) {
+        context.showSnackBar(
+          'MTA could not be enabled. Check your vehicle and try again in Settings.',
+        );
+      }
+    } on MtaApiException {
+      // No invitation until the MTA service/configuration is available.
+      // Settings exposes the connection error and keeps the switch available.
+    } catch (_) {
+      // Core/status reads may fail during startup. Retry on next resume.
+    } finally {
+      _mtaInvitationInProgress = false;
     }
   }
 
@@ -146,14 +221,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: AppText.body(
-          getString(appStr.headingPermissionRequired, 'heading_permission_required')
-              .replacePlaceholders({StringConstant.param: 'Location'}),
+          getString(
+            appStr.headingPermissionRequired,
+            'heading_permission_required',
+          ).replacePlaceholders({StringConstant.param: 'Location'}),
           fontWeight: FontWeight.w600,
         ),
         content: AppText.body(
-          getString(appStr.descriptionEnablePermissionInSettings,
-                  'description_enable_permission_in_settings')
-              .replacePlaceholders({StringConstant.param: 'location'}),
+          getString(
+            appStr.descriptionEnablePermissionInSettings,
+            'description_enable_permission_in_settings',
+          ).replacePlaceholders({StringConstant.param: 'location'}),
         ),
         actions: [
           if (permanentlyDenied) ...[
@@ -162,7 +240,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               onPressed: () => Navigator.pop(context),
             ),
             AppTextButton(
-              text: getString(appStr.buttonOpenSettings, 'button_open_settings'),
+              text: getString(
+                appStr.buttonOpenSettings,
+                'button_open_settings',
+              ),
               onPressed: () {
                 Navigator.pop(context);
                 PermissionManager.instance.openSettings();
@@ -173,7 +254,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               text: getString(appStr.buttonOk, 'button_ok'),
               onPressed: () async {
                 Navigator.pop(context);
-                final result = await PermissionManager.instance.requestLocation();
+                final result = await PermissionManager.instance
+                    .requestLocation();
                 if (mounted && result == PermissionResult.permanentlyDenied) {
                   _showLocationPermissionDialog(permanentlyDenied: true);
                 }
@@ -225,11 +307,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _mapManager.setHeatMap(
           locations
               .where((l) => l.latitude != null && l.longitude != null)
-              .map((l) => HeatMapPoint(
-                    latitude: l.latitude!,
-                    longitude: l.longitude!,
-                    weight: l.weight,
-                  ))
+              .map(
+                (l) => HeatMapPoint(
+                  latitude: l.latitude!,
+                  longitude: l.longitude!,
+                  weight: l.weight,
+                ),
+              )
               .toList(),
         );
       }
@@ -239,7 +323,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final homeState = ref.watch(homeViewModelProvider);
-    final displayedMtaOffer = homeState.activeMtaTrip == null &&
+    // Keep the consent handler alive while the approval invitation is shown.
+    ref.watch(settingsViewModelProvider);
+    final displayedMtaOffer =
+        homeState.activeMtaTrip == null &&
             homeState.mtaAcceptanceOutcomeUnknownTripId == null &&
             homeState.mtaOffers.isNotEmpty
         ? homeState.mtaOffers.first
@@ -316,15 +403,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: Stack(
         children: [
           // Layer 1: Full-screen Google Map
-          Positioned.fill(
-            child: MapHost(manager: _mapManager),
-          ),
+          Positioned.fill(child: MapHost(manager: _mapManager)),
 
           // Layer 2: Approval pending overlay (below top bar & bottom section)
           if (homeState.showApprovalScreen)
-            Positioned.fill(
-              child: _buildApprovalOverlay(colors, homeState),
-            ),
+            Positioned.fill(child: _buildApprovalOverlay(colors, homeState)),
 
           // Layer 3: Top bar
           Positioned(
@@ -334,16 +417,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: _buildTopBar(colors, homeState),
           ),
 
-          if (homeState.activeMtaTrip != null &&
-              !homeState.showApprovalScreen)
+          if (homeState.activeMtaTrip != null && !homeState.showApprovalScreen)
             Positioned(
               top: topPadding + 88,
               left: AppDimens.padding,
               right: AppDimens.padding,
-              child: _buildMtaActiveTripCard(
-                colors,
-                homeState.activeMtaTrip!,
-              ),
+              child: _buildMtaActiveTripCard(colors, homeState.activeMtaTrip!),
             )
           else if (homeState.mtaAcceptanceOutcomeUnknownTripId != null &&
               !homeState.showApprovalScreen)
@@ -358,8 +437,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ref.read(homeViewModelProvider.notifier),
               ),
             )
-          else if (displayedMtaOffer != null &&
-              !homeState.showApprovalScreen)
+          else if (displayedMtaOffer != null && !homeState.showApprovalScreen)
             Positioned(
               top: topPadding + 88,
               left: AppDimens.padding,
@@ -381,7 +459,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               // Clear the bottom status bar only (~64 + safe area) and sit
               // beside the GO button rather than above it — the GO button is
               // centred, so the right edge next to it is free space.
-              bottom: 80 +
+              bottom:
+                  80 +
                   bottomPadding +
                   (homeState.isOnline &&
                           homeState.goingToAddressAddress != null &&
@@ -505,12 +584,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final expiresText = remaining == null
         ? 'Expiry not provided'
         : remaining <= 0
-            ? 'Offer expired'
-            : 'Expires in ${remaining}s';
+        ? 'Offer expired'
+        : 'Expires in ${remaining}s';
     final scheduled = offer.scheduledTime == null
         ? null
         : MaterialLocalizations.of(context).formatTimeOfDay(
-            TimeOfDay.fromDateTime(offer.scheduledTime!.toLocal()));
+            TimeOfDay.fromDateTime(offer.scheduledTime!.toLocal()),
+          );
     final payout = offer.driverPayoutCents == null
         ? null
         : '${offer.currency} ${(offer.driverPayoutCents! / 100).toStringAsFixed(2)}';
@@ -531,8 +611,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                 ),
                 if (payout != null)
-                  AppText.body('Driver payout: $payout',
-                      fontWeight: FontWeight.w700),
+                  AppText.body(
+                    'Driver payout: $payout',
+                    fontWeight: FontWeight.w700,
+                  ),
               ],
             ),
             const SizedBox(height: AppDimens.paddingS),
@@ -541,10 +623,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             if (scheduled != null) AppText.caption('Scheduled: $scheduled'),
             if (failureMessage != null) ...[
               const SizedBox(height: AppDimens.paddingS),
-              AppText.body(
-                failureMessage,
-                color: colors.colorWarning,
-              ),
+              AppText.body(failureMessage, color: colors.colorWarning),
             ],
             AppText.caption(
               expiresText,
@@ -557,18 +636,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: isResponding || (remaining != null && remaining <= 0)
+                    onPressed:
+                        isResponding || (remaining != null && remaining <= 0)
                         ? null
-                        : () => viewModel.respondToMtaOffer(offer, accept: false),
+                        : () =>
+                              viewModel.respondToMtaOffer(offer, accept: false),
                     child: const Text('Reject'),
                   ),
                 ),
                 const SizedBox(width: AppDimens.paddingS),
                 Expanded(
                   child: FilledButton(
-                    onPressed: isResponding || (remaining != null && remaining <= 0)
+                    onPressed:
+                        isResponding || (remaining != null && remaining <= 0)
                         ? null
-                        : () => viewModel.respondToMtaOffer(offer, accept: true),
+                        : () =>
+                              viewModel.respondToMtaOffer(offer, accept: true),
                     child: isResponding
                         ? const SizedBox(
                             height: 18,
@@ -610,8 +693,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     HomeState homeState,
     HomeViewModel viewModel,
   ) {
-    final buttonColor =
-        homeState.isOnline ? colors.colorWarning : colors.colorSecondary;
+    final buttonColor = homeState.isOnline
+        ? colors.colorWarning
+        : colors.colorSecondary;
     const double buttonSize = 80;
 
     return GestureDetector(
@@ -694,10 +778,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildMtaActiveTripCard(
-    AppColorPalette colors,
-    MtaActiveTrip trip,
-  ) {
+  Widget _buildMtaActiveTripCard(AppColorPalette colors, MtaActiveTrip trip) {
     final confirmationMessage = switch (trip.partnerConfirmationStatus) {
       'confirmed' => 'Broker confirmation: confirmed.',
       'failed' => 'Broker confirmation failed.',
@@ -723,10 +804,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(height: AppDimens.paddingS),
             AppText.body('Trip ID: ${trip.tripId}'),
             AppText.body('Trip status: ${trip.status.toUpperCase()}'),
-            AppText.body(
-              confirmationMessage,
-              color: confirmationColor,
-            ),
+            AppText.body(confirmationMessage, color: confirmationColor),
             if (trip.partnerConfirmationAttemptedAt != null)
               AppText.caption(
                 'Partner confirmation attempted: '
@@ -794,8 +872,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     double bottomPadding,
   ) {
     final viewModel = ref.read(homeViewModelProvider.notifier);
-    final hasMissingInfo = homeState.missingInfoItems.isNotEmpty &&
-        !homeState.showApprovalScreen;
+    final hasMissingInfo =
+        homeState.missingInfoItems.isNotEmpty && !homeState.showApprovalScreen;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -823,7 +901,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                     child: AppText.body(
                       getString(
-                          appStr.buttonPickVehicle, 'button_pick_vehicle'),
+                        appStr.buttonPickVehicle,
+                        'button_pick_vehicle',
+                      ),
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
                     ),
@@ -851,8 +931,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     borderRadius: BorderRadius.circular(AppDimens.paddingXL),
                   ),
                   child: AppText.body(
-                    getString(
-                        appStr.buttonDropVehicle, 'button_drop_vehicle'),
+                    getString(appStr.buttonDropVehicle, 'button_drop_vehicle'),
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
@@ -925,11 +1004,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       child: AppText.body(
                         homeState.isOnline
                             ? (homeState.zoneQueue.isNotEmpty
-                                ? homeState.zoneQueue
-                                : getString(appStr.textYoureOnline,
-                                    'text_youre_online'))
+                                  ? homeState.zoneQueue
+                                  : getString(
+                                      appStr.textYoureOnline,
+                                      'text_youre_online',
+                                    ))
                             : getString(
-                                appStr.textYoureOffline, 'text_youre_offline'),
+                                appStr.textYoureOffline,
+                                'text_youre_offline',
+                              ),
                         fontWeight: FontWeight.w600,
                         color: colors.colorText,
                         maxLines: 1,
@@ -968,10 +1051,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Padding(
                   padding: const EdgeInsets.only(top: AppDimens.paddingS),
                   child: AppText.body(
-                    getString(appStr.errorWalletLimitCash,
-                            'error_wallet_limit_cash')
-                        .replaceAll('{{_AMOUNT}}',
-                            homeState.cashBookingMinimumWallet),
+                    getString(
+                      appStr.errorWalletLimitCash,
+                      'error_wallet_limit_cash',
+                    ).replaceAll(
+                      '{{_AMOUNT}}',
+                      homeState.cashBookingMinimumWallet,
+                    ),
                     color: colors.colorWarning,
                     textAlign: TextAlign.center,
                     maxLines: 2,
@@ -1072,10 +1158,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           // Warning accent bar at top
-          Container(
-            height: 4,
-            color: colors.colorWarning,
-          ),
+          Container(height: 4, color: colors.colorWarning),
 
           // Header: warning icon + title + count
           Padding(
@@ -1099,8 +1182,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                       const SizedBox(height: 2),
                       AppText.caption(
-                        getString(appStr.textGoOnlineWhenResolved,
-                            'text_go_online_when_resolved'),
+                        getString(
+                          appStr.textGoOnlineWhenResolved,
+                          'text_go_online_when_resolved',
+                        ),
                         color: colors.colorWarning,
                       ),
                     ],
@@ -1200,8 +1285,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (result == true) _refreshAfterMissingInfo();
         break;
       case 5: // City
-        final countryId =
-            ref.read(homeViewModelProvider.notifier).entityCountryId;
+        final countryId = ref
+            .read(homeViewModelProvider.notifier)
+            .entityCountryId;
         final result = await context.navigateToSelectCountryCity(
           needsCountry: false,
           existingCountryId: countryId,
@@ -1248,10 +1334,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
         break;
       case 11: // Select Business
-        final selected = await showBusinessTypeBottomSheet(
-          context,
-          [BusinessType.taxi],
-        );
+        final selected = await showBusinessTypeBottomSheet(context, [
+          BusinessType.taxi,
+        ]);
         if (selected != null && mounted) {
           final success = await ref
               .read(homeViewModelProvider.notifier)
@@ -1283,14 +1368,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         // pops mirrors native's `socketForCheckr()` reload. (Listening for that
         // socket event here would break the WebView's own listener, since
         // SocketManager.offEvent removes every handler for an event.)
-        final url =
-            await ref.read(homeViewModelProvider.notifier).initiateCheckr();
+        final url = await ref
+            .read(homeViewModelProvider.notifier)
+            .initiateCheckr();
         if (url != null && mounted) {
           await context.navigateToWebView(
-            webViewData: WebViewDataModel(
-              webURL: url,
-              name: item.title,
-            ),
+            webViewData: WebViewDataModel(webURL: url, name: item.title),
           );
           if (mounted) _refreshAfterMissingInfo();
         }
@@ -1304,10 +1387,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // ── Approval Pending Overlay (Mode B) ────────────────────────────
 
-  Widget _buildApprovalOverlay(
-    AppColorPalette colors,
-    HomeState homeState,
-  ) {
+  Widget _buildApprovalOverlay(AppColorPalette colors, HomeState homeState) {
     final title = homeState.missingInfoItems.isNotEmpty
         ? homeState.missingInfoItems.first.title
         : '';
@@ -1320,8 +1400,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: SafeArea(
         child: Center(
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: AppDimens.padding),
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.padding),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1346,7 +1425,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: AppDimens.paddingXL),
                   AppFilledButton(
                     text: getString(
-                        appStr.buttonContactUs, 'button_contact_us'),
+                      appStr.buttonContactUs,
+                      'button_contact_us',
+                    ),
                     onPressed: () => context.navigateToContactUs(),
                   ),
                 ],
@@ -1382,11 +1463,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     color: Colors.red.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.block,
-                    color: Colors.red,
-                    size: 40,
-                  ),
+                  child: const Icon(Icons.block, color: Colors.red, size: 40),
                 ),
 
                 const SizedBox(height: AppDimens.paddingL),

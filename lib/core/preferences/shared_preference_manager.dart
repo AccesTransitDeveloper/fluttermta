@@ -43,10 +43,7 @@ class SharedPreferenceManager {
   }
 
   Future<bool> setLocalBaseUrl(String baseUrl) {
-    return _prefs.setString(
-      SharedPreferencesConstants.localBaseUrl,
-      baseUrl,
-    );
+    return _prefs.setString(SharedPreferencesConstants.localBaseUrl, baseUrl);
   }
 
   // Authorization Token
@@ -57,6 +54,12 @@ class SharedPreferenceManager {
   Future<bool> setAuthorization(String token) {
     return _prefs.setString(SharedPreferencesConstants.authorization, token);
   }
+
+  bool hasSeenMtaInvitation(String driverId, String termsVersion) =>
+      _prefs.getString('mta_invitation_$driverId') == termsVersion;
+
+  Future<bool> markMtaInvitationSeen(String driverId, String termsVersion) =>
+      _prefs.setString('mta_invitation_$driverId', termsVersion);
 
   Future<bool> removeAuthorization() {
     return _prefs.remove(SharedPreferencesConstants.authorization);
@@ -210,7 +213,10 @@ class SharedPreferenceManager {
   }
 
   Future<bool> setSpeakingLanguage(String languageCode) {
-    return _prefs.setString(SharedPreferencesConstants.speakingLanguage, languageCode);
+    return _prefs.setString(
+      SharedPreferencesConstants.speakingLanguage,
+      languageCode,
+    );
   }
 
   // Online state (persisted for service restart)
@@ -243,19 +249,29 @@ class SharedPreferenceManager {
   // Last Driver Location (for cold restart when standing still)
   ({double latitude, double longitude})? getLastDriverLocation() {
     final lat = _prefs.getDouble(SharedPreferencesConstants.lastDriverLatitude);
-    final lng = _prefs.getDouble(SharedPreferencesConstants.lastDriverLongitude);
+    final lng = _prefs.getDouble(
+      SharedPreferencesConstants.lastDriverLongitude,
+    );
     if (lat == null || lng == null) return null;
     return (latitude: lat, longitude: lng);
   }
 
   Future<void> setLastDriverLocation(double latitude, double longitude) async {
-    await _prefs.setDouble(SharedPreferencesConstants.lastDriverLatitude, latitude);
-    await _prefs.setDouble(SharedPreferencesConstants.lastDriverLongitude, longitude);
+    await _prefs.setDouble(
+      SharedPreferencesConstants.lastDriverLatitude,
+      latitude,
+    );
+    await _prefs.setDouble(
+      SharedPreferencesConstants.lastDriverLongitude,
+      longitude,
+    );
   }
 
   // Prominent location disclosure accepted (Google Play background-location requirement)
   bool getLocationDisclosureAccepted() {
-    return _prefs.getBool(SharedPreferencesConstants.locationDisclosureAccepted) ??
+    return _prefs.getBool(
+          SharedPreferencesConstants.locationDisclosureAccepted,
+        ) ??
         false;
   }
 

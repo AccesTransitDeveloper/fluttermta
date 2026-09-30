@@ -5,6 +5,7 @@ class AiDriverDocumentDraft {
   final String? localFilePath;
   final String? originalFileName;
   final DateTime? capturedAt;
+  final String uploadStatus;
 
   const AiDriverDocumentDraft({
     required this.id,
@@ -13,6 +14,7 @@ class AiDriverDocumentDraft {
     this.localFilePath,
     this.originalFileName,
     this.capturedAt,
+    this.uploadStatus = 'notSubmitted',
   });
 
   bool get isCollected =>
@@ -30,6 +32,7 @@ class AiDriverDocumentDraft {
       localFilePath: localFilePath ?? this.localFilePath,
       originalFileName: originalFileName ?? this.originalFileName,
       capturedAt: capturedAt ?? this.capturedAt,
+      uploadStatus: localFilePath != null ? 'notSubmitted' : uploadStatus,
     );
   }
 
@@ -48,7 +51,7 @@ class AiDriverDocumentDraft {
     'localFilePath': localFilePath,
     'originalFileName': originalFileName,
     'capturedAt': capturedAt?.toIso8601String(),
-    'uploadStatus': 'notSubmitted',
+    'uploadStatus': uploadStatus,
     'networkDestination': null,
   };
 
@@ -62,6 +65,30 @@ class AiDriverDocumentDraft {
       capturedAt: json['capturedAt'] == null
           ? null
           : DateTime.tryParse(json['capturedAt'] as String),
+      uploadStatus:
+          const {'uploaded', 'uncertain'}.contains(json['uploadStatus'])
+          ? json['uploadStatus'] as String
+          : 'notSubmitted',
     );
   }
+
+  AiDriverDocumentDraft markUploaded() => AiDriverDocumentDraft(
+    id: id,
+    title: title,
+    description: description,
+    localFilePath: localFilePath,
+    originalFileName: originalFileName,
+    capturedAt: capturedAt,
+    uploadStatus: 'uploaded',
+  );
+
+  AiDriverDocumentDraft markUncertain() => AiDriverDocumentDraft(
+    id: id,
+    title: title,
+    description: description,
+    localFilePath: localFilePath,
+    originalFileName: originalFileName,
+    capturedAt: capturedAt,
+    uploadStatus: 'uncertain',
+  );
 }
