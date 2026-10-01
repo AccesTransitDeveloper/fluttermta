@@ -1,0 +1,441 @@
+diff --git a/artifacts/api-server/DRIVER_API.md b/artifacts/api-server/DRIVER_API.md
+new file mode 100644
+index 0000000..60bf690
+--- /dev/null
++++ b/artifacts/api-server/DRIVER_API.md
+@@ -0,0 +1,97 @@
++# MTA driver API
++
++The Flutter build's base URL is:
++
++```text
++https://mta-accessibletransit.com/api/mta/driver-app
++```
++
++```bash
++flutter build apk --dart-define="MTA_API_BASE_URL=https://mta-accessibletransit.com/api/mta/driver-app"
++```
++
++Every request requires `Authorization: Bearer <Core driver login token>`.
++POST requests use `Content-Type: application/json`.
++There is no separate MTA login/token and no admin session is needed.
++Never put broker tokens or admin credentials into Flutter.
++
++| Method | Path relative to base URL | Purpose |
++| --- | --- | --- |
++| GET | `/status` | MTA consent, eligibility and active trip/offer state |
++| POST | `/consent` | Enable/disable MTA; register the Core-authenticated driver |
++| POST | `/location` | Send online GPS and availability, or mark offline |
++| GET | `/offers` | Retrieve this driver's current unexpired offers |
++| POST | `/offers/{tripId}/accept` | Accept this driver's offer |
++| POST | `/offers/{tripId}/reject` | Reject this driver's offer and try another driver |
++
++Consent payload:
++
++```json
++{
++  "accepted": true,
++  "termsVersion": "mta-driver-consent-v1",
++  "driver": {
++    "name": "Driver name",
++    "phone": "Driver phone",
++    "vehicle": "Selected vehicle",
++    "plateNumber": "Optional plate",
++    "tlcLicenseNumber": "Optional TLC license"
++  }
++}
++```
++
++Online location payload (timestamp must be the real, recent UTC sensor fix):
++
++```json
++{
++  "lat": 40.7,
++  "lng": -73.9,
++  "timestamp": "<actual GPS fix time in ISO 8601 UTC>",
++  "online": true,
++  "available": true
++}
++```
++
++Offline payload: `{"online":false,"available":false}`.
++Accept/reject payload: `{}`; use the trip ID returned by `/offers`.
++Flutter also sends `Idempotency-Key: mta-{offerId}-accept` (or `-reject`).
++
++Automatic matching uses **2 straight-line miles** from pickup to driver.
++Driver consent, Core document readiness, online/available state, and fresh
++GPS are required. Drivers with an active trip/offer are not matched again.
++Offers expire after 30 seconds. Flutter polls every 8 seconds while it can
++run; delivery in a suspended/terminated app is not guaranteed push delivery.
++Accepted by MTA does not necessarily mean confirmed by the broker: inspect
++the returned `partnerConfirmationStatus`.
++
++## Verify after publishing
++
++An unauthenticated `GET /api/mta/driver-app/status` must return HTTP 401:
++
++```json
++{"error":"A Core bearer token is required"}
++```
++
++`Unauthorized — please log in` is an admin-session response and indicates
++the live driver routes are not using the intended driver authentication.
++Never remove authentication to work around this. Workspace changes and
++Flutter/GitHub updates do not update the published backend: publish the
++current backend before testing the public URL again.
++
++A Core outage returns HTTP 503, not successful driver authentication.
++Verification with a real device is still needed for the complete
++GPS → offer → accept/reject flow.
++
++## Regression checks
++
++Run from the workspace root:
++
++```bash
++NODE_ENV=production pnpm --filter @workspace/scripts exec tsx --test ../artifacts/api-server/test/*.test.ts
++pnpm --filter @workspace/api-server run typecheck
++pnpm --filter @workspace/api-server run build
++```
++
++Tests do not use real driver tokens, modify driver/trip data, or contact
++brokers. Driver-auth tests stub Core responses, so their passing does not
++prove the real Core service is reachable.
+\ No newline at end of file
+diff --git a/artifacts/api-server/src/middleware/requireAuth.ts b/artifacts/api-server/src/middleware/requireAuth.ts
+index 20b6d88..9453759 100644
+--- a/artifacts/api-server/src/middleware/requireAuth.ts
++++ b/artifacts/api-server/src/middleware/requireAuth.ts
+@@ -2,7 +2,8 @@ import { type Request, type Response, type NextFunction } from 'express';
+ 
+ /**
+  * Express middleware: reject requests without a valid admin session.
+- * Applied to all /api routes except /api/auth/*.
++ * Applied to admin routes after public health/auth, broker webhooks,
++ * and the independently Core-bearer-authenticated driver-app router.
+  */
+ export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+   if (req.session.authenticated) {
+diff --git a/artifacts/api-server/src/routes/mta/drivers.ts b/artifacts/api-server/src/routes/mta/drivers.ts
+index 74cdd0a..02664d5 100644
+--- a/artifacts/api-server/src/routes/mta/drivers.ts
++++ b/artifacts/api-server/src/routes/mta/drivers.ts
+@@ -18,6 +18,7 @@ import {
+   FindNearbyDriversBody,
+ } from "@workspace/api-zod";
+ import { findNearbyDrivers } from "../../services/mta/matchingEngine.js";
++import { DEFAULT_MATCH_RADIUS_MILES } from "../../services/mta/matchingPolicy.js";
+ 
+ const router: IRouter = Router();
+ 
+@@ -29,7 +30,7 @@ router.post("/mta/drivers/nearby", async (req, res): Promise<void> => {
+     return;
+   }
+ 
+-  const { lat, lng, radius_miles = 3 } = parsed.data;
++  const { lat, lng, radius_miles = DEFAULT_MATCH_RADIUS_MILES } = parsed.data;
+   const drivers = await findNearbyDrivers(lat, lng, radius_miles);
+ 
+   res.json(
+diff --git a/artifacts/api-server/src/services/mta/matchingEngine.ts b/artifacts/api-server/src/services/mta/matchingEngine.ts
+index 9ac6ea6..81b2c09 100644
+--- a/artifacts/api-server/src/services/mta/matchingEngine.ts
++++ b/artifacts/api-server/src/services/mta/matchingEngine.ts
+@@ -10,11 +10,11 @@
+ import { db, mtaDriversTable, mtaTripsTable } from "@workspace/db";
+ import { eq, and, isNotNull, isNull, gt } from "drizzle-orm";
+ import { haversineDistanceMiles } from "./haversine.js";
++import { DEFAULT_MATCH_RADIUS_MILES, isWithinMatchingRadius } from "./matchingPolicy.js";
+ import { notifyDriverOfTrip } from "./driverNotifier.js";
+ import { bookTripOnTripLink } from "./triplinkBooking.js";
+ import { logger } from "../../lib/logger.js";
+ 
+-const DEFAULT_RADIUS_MILES = 3;
+ const OFFER_TIMEOUT_MS = 30_000; // 30 s per driver
+ const LOCATION_MAX_AGE_MS = 2 * 60_000;
+ 
+@@ -36,7 +36,7 @@ export interface DriverWithDistance {
+ export async function findNearbyDrivers(
+   lat: number,
+   lng: number,
+-  radiusMiles: number = DEFAULT_RADIUS_MILES,
++  radiusMiles: number = DEFAULT_MATCH_RADIUS_MILES,
+   excludedExternalDriverIds: string[] = [],
+ ): Promise<DriverWithDistance[]> {
+   const locationFreshAfter = new Date(Date.now() - LOCATION_MAX_AGE_MS);
+@@ -77,7 +77,7 @@ export async function findNearbyDrivers(
+         parseFloat(d.lng!),
+       ),
+     }))
+-    .filter((d) => d.distanceMiles <= radiusMiles)
++    .filter((d) => isWithinMatchingRadius(d.distanceMiles, radiusMiles))
+     .sort((a, b) => a.distanceMiles - b.distanceMiles);
+ 
+   return withDistance;
+@@ -238,7 +238,7 @@ export async function startMatchingFlow(tripId: number): Promise<void> {
+ 
+   logger.info({ tripId, lat, lng }, "MTA matching: searching nearby drivers");
+ 
+-  const drivers = await findNearbyDrivers(lat, lng, DEFAULT_RADIUS_MILES, trip.rejectedDriverIds);
++  const drivers = await findNearbyDrivers(lat, lng, DEFAULT_MATCH_RADIUS_MILES, trip.rejectedDriverIds);
+ 
+   if (drivers.length === 0) {
+     await returnTripToPendingMatch(trip, "no_candidates");
+diff --git a/artifacts/api-server/src/services/mta/matchingPolicy.ts b/artifacts/api-server/src/services/mta/matchingPolicy.ts
+new file mode 100644
+index 0000000..078b6b9
+--- /dev/null
++++ b/artifacts/api-server/src/services/mta/matchingPolicy.ts
+@@ -0,0 +1,13 @@
++/** Automatic MTA dispatch uses straight-line miles from pickup to driver. */
++export const DEFAULT_MATCH_RADIUS_MILES = 2;
++
++export function isWithinMatchingRadius(
++  distanceMiles: number,
++  radiusMiles: number = DEFAULT_MATCH_RADIUS_MILES,
++): boolean {
++  return Number.isFinite(distanceMiles)
++    && distanceMiles >= 0
++    && Number.isFinite(radiusMiles)
++    && radiusMiles > 0
++    && distanceMiles <= radiusMiles;
++}
+\ No newline at end of file
+diff --git a/artifacts/api-server/test/driverAuth.test.ts b/artifacts/api-server/test/driverAuth.test.ts
+new file mode 100644
+index 0000000..094a2c1
+--- /dev/null
++++ b/artifacts/api-server/test/driverAuth.test.ts
+@@ -0,0 +1,98 @@
++import assert from "node:assert/strict";
++import { createServer } from "node:http";
++import { test } from "node:test";
++import app from "../src/app.js";
++
++const localFetch = globalThis.fetch.bind(globalThis);
++
++test("driver-app routes use Core bearer auth while admin driver routes require a session", async () => {
++  const server = createServer(app);
++  await new Promise<void>((resolve, reject) => {
++    server.once("error", reject);
++    server.listen(0, "127.0.0.1", resolve);
++  });
++
++  const originalFetch = globalThis.fetch;
++  const coreRequests: Array<{ url: string; authorization: string | undefined }> = [];
++  let coreStatus = 401;
++
++  try {
++    const address = server.address();
++    assert.ok(address && typeof address !== "string");
++    const baseUrl = `http://127.0.0.1:${address.port}`;
++
++    globalThis.fetch = (async (input, init) => {
++      const url = new URL(input instanceof Request ? input.url : String(input));
++      coreRequests.push({
++        url: url.toString(),
++        authorization: new Headers(init?.headers).get("authorization") ?? undefined,
++      });
++      return new Response("{}", { status: coreStatus });
++    }) as typeof fetch;
++
++    const driverRoutes = [
++      { method: "POST", path: "/api/mta/driver-app/consent" },
++      { method: "GET", path: "/api/mta/driver-app/status" },
++      { method: "POST", path: "/api/mta/driver-app/location" },
++      { method: "GET", path: "/api/mta/driver-app/offers" },
++      { method: "POST", path: "/api/mta/driver-app/offers/123/accept" },
++      { method: "POST", path: "/api/mta/driver-app/offers/123/reject" },
++    ];
++
++    for (const route of driverRoutes) {
++      const response = await localFetch(`${baseUrl}${route.path}`, {
++        method: route.method,
++        headers: { connection: "close" },
++      });
++      const body = await response.json() as { error?: string };
++
++      assert.equal(response.status, 401, `${route.method} ${route.path}`);
++      assert.equal(body.error, "A Core bearer token is required");
++      assert.notEqual(body.error, "Unauthorized — please log in");
++    }
++    assert.equal(coreRequests.length, 0, "missing bearer requests must not contact Core");
++
++    const adminResponse = await localFetch(`${baseUrl}/api/mta/drivers`, {
++      headers: { connection: "close" },
++    });
++    const adminBody = await adminResponse.json() as { error?: string };
++    assert.equal(adminResponse.status, 401);
++    assert.equal(adminBody.error, "Unauthorized — please log in");
++    assert.equal(coreRequests.length, 0, "admin routes must not contact Core");
++
++    for (const scenario of [
++      {
++        upstreamStatus: 401,
++        expectedStatus: 401,
++        expectedError: "Core authentication could not verify this driver",
++      },
++      {
++        upstreamStatus: 521,
++        expectedStatus: 503,
++        expectedError: "Core authentication could not verify this driver",
++      },
++    ]) {
++      coreStatus = scenario.upstreamStatus;
++      const response = await localFetch(`${baseUrl}/api/mta/driver-app/status`, {
++        headers: {
++          authorization: "Bearer deliberately-invalid-test-token",
++          connection: "close",
++        },
++      });
++      const body = await response.json() as { error?: string };
++
++      assert.equal(response.status, scenario.expectedStatus);
++      assert.equal(body.error, scenario.expectedError);
++      assert.notEqual(body.error, "Unauthorized — please log in");
++      assert.equal(coreRequests.at(-1)?.authorization, "Bearer deliberately-invalid-test-token");
++      assert.equal(new URL(coreRequests.at(-1)!.url).pathname, "/api/auth/get_entity_detail");
++    }
++    assert.equal(coreRequests.length, 2, "each bearer verification should make only the Core detail request");
++  } finally {
++    globalThis.fetch = originalFetch;
++    await new Promise<void>((resolve, reject) => {
++      server.close((error) => error ? reject(error) : resolve());
++      server.closeAllConnections();
++    });
++  }
++});
+\ No newline at end of file
+diff --git a/artifacts/api-server/test/matchingPolicy.test.ts b/artifacts/api-server/test/matchingPolicy.test.ts
+new file mode 100644
+index 0000000..067e0e6
+--- /dev/null
++++ b/artifacts/api-server/test/matchingPolicy.test.ts
+@@ -0,0 +1,41 @@
++import assert from "node:assert/strict";
++import { test } from "node:test";
++import { FindNearbyDriversBody } from "@workspace/api-zod";
++import { haversineDistanceMiles } from "../src/services/mta/haversine.js";
++import {
++  DEFAULT_MATCH_RADIUS_MILES,
++  isWithinMatchingRadius,
++} from "../src/services/mta/matchingPolicy.js";
++
++test("automatic matching includes 2 miles but excludes anything further away", () => {
++  assert.equal(DEFAULT_MATCH_RADIUS_MILES, 2);
++  for (const distance of [0, 1, 1.999, 2]) {
++    assert.equal(isWithinMatchingRadius(distance), true);
++  }
++  for (const distance of [2.000001, 2.10, 2.39, 3, NaN, Infinity, -1]) {
++    assert.equal(isWithinMatchingRadius(distance), false);
++  }
++});
++
++test("distance remains in miles and uses the pickup-to-driver straight-line distance", () => {
++  assert.equal(haversineDistanceMiles(40.7, -73.9, 40.7, -73.9), 0);
++  const latitudeOffsetForMiles = (miles: number) =>
++    (miles / 3958.8) * (180 / Math.PI);
++  assert.equal(isWithinMatchingRadius(
++    haversineDistanceMiles(0, 0, latitudeOffsetForMiles(1.99), 0),
++  ), true);
++  assert.equal(isWithinMatchingRadius(
++    haversineDistanceMiles(0, 0, latitudeOffsetForMiles(2.01), 0),
++  ), false);
++});
++
++test("admin nearby-search schema defaults to the same 2 miles", () => {
++  const input = FindNearbyDriversBody.parse({ lat: 40.7, lng: -73.9 });
++  assert.equal(input.radius_miles, DEFAULT_MATCH_RADIUS_MILES);
++  assert.equal(FindNearbyDriversBody.safeParse({
++    lat: 40.7, lng: -73.9, radius_miles: 0,
++  }).success, false);
++  assert.equal(FindNearbyDriversBody.safeParse({
++    lat: 40.7, lng: -73.9, radius_miles: -1,
++  }).success, false);
++});
+\ No newline at end of file
+diff --git a/lib/api-client-react/src/generated/api.schemas.ts b/lib/api-client-react/src/generated/api.schemas.ts
+index f28b60f..06170c7 100644
+--- a/lib/api-client-react/src/generated/api.schemas.ts
++++ b/lib/api-client-react/src/generated/api.schemas.ts
+@@ -389,6 +389,7 @@ export interface DriverLocationUpdate {
+ export interface NearbySearchInput {
+   lat: number;
+   lng: number;
++  /** @exclusiveMinimum 0 */
+   radius_miles?: number;
+ }
+ 
+diff --git a/lib/api-client-react/src/generated/api.ts b/lib/api-client-react/src/generated/api.ts
+index fb83c35..e51b983 100644
+--- a/lib/api-client-react/src/generated/api.ts
++++ b/lib/api-client-react/src/generated/api.ts
+@@ -1590,7 +1590,7 @@ export const getFindNearbyDriversUrl = () => {
+ }
+ 
+ /**
+- * Returns available drivers within the specified radius (default 3 miles)
++ * Returns available drivers within the specified radius (default 2 miles). Automatic trip matching always uses 2 miles.
+  * @summary Find available drivers near a location
+  */
+ export const findNearbyDrivers = async (nearbySearchInput: NearbySearchInput, options?: Parameters<typeof customFetch>[1]): Promise<NearbyDriver[]> => {
+diff --git a/lib/api-spec/openapi.yaml b/lib/api-spec/openapi.yaml
+index 0ae2d1a..d420aac 100644
+--- a/lib/api-spec/openapi.yaml
++++ b/lib/api-spec/openapi.yaml
+@@ -615,7 +615,7 @@ paths:
+       operationId: findNearbyDrivers
+       tags: [mta-drivers]
+       summary: Find available drivers near a location
+-      description: Returns available drivers within the specified radius (default 3 miles)
++      description: Returns available drivers within the specified radius (default 2 miles). Automatic trip matching always uses 2 miles.
+       requestBody:
+         required: true
+         content:
+@@ -1429,7 +1429,8 @@ components:
+           type: number
+         radius_miles:
+           type: number
+-          default: 3
++          exclusiveMinimum: 0
++          default: 2
+       required: [lat, lng]
+ 
+     NearbyDriver:
+diff --git a/lib/api-zod/src/generated/api.ts b/lib/api-zod/src/generated/api.ts
+index 7be8e9a..5c1c7f0 100644
+--- a/lib/api-zod/src/generated/api.ts
++++ b/lib/api-zod/src/generated/api.ts
+@@ -650,15 +650,18 @@ export const UpdateDriverLocationResponse = zod.object({
+ 
+ 
+ /**
+- * Returns available drivers within the specified radius (default 3 miles)
++ * Returns available drivers within the specified radius (default 2 miles). Automatic trip matching always uses 2 miles.
+  * @summary Find available drivers near a location
+  */
+-export const findNearbyDriversBodyRadiusMilesDefault = 3;
++export const findNearbyDriversBodyRadiusMilesDefault = 2;
++export const findNearbyDriversBodyRadiusMilesExclusiveMin = 0;
++
++
+ 
+ export const FindNearbyDriversBody = zod.object({
+   "lat": zod.number(),
+   "lng": zod.number(),
+-  "radius_miles": zod.number().default(findNearbyDriversBodyRadiusMilesDefault)
++  "radius_miles": zod.number().gt(findNearbyDriversBodyRadiusMilesExclusiveMin).default(findNearbyDriversBodyRadiusMilesDefault)
+ })
+ 
+ export const FindNearbyDriversResponseItem = zod.object({
+diff --git a/lib/api-zod/src/generated/types/nearbySearchInput.ts b/lib/api-zod/src/generated/types/nearbySearchInput.ts
+index 957c4b6..c8b7da1 100644
+--- a/lib/api-zod/src/generated/types/nearbySearchInput.ts
++++ b/lib/api-zod/src/generated/types/nearbySearchInput.ts
+@@ -9,5 +9,6 @@
+ export interface NearbySearchInput {
+   lat: number;
+   lng: number;
++  /** @exclusiveMinimum 0 */
+   radius_miles?: number;
+ }
