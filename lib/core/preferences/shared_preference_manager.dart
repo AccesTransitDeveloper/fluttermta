@@ -51,6 +51,11 @@ class SharedPreferenceManager {
     return _prefs.getString(SharedPreferencesConstants.authorization);
   }
 
+  bool hasAuthorizationToken() {
+    final token = getAuthorization();
+    return token != null && token.trim().isNotEmpty;
+  }
+
   Future<bool> setAuthorization(String token) {
     return _prefs.setString(SharedPreferencesConstants.authorization, token);
   }

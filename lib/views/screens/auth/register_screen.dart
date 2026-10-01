@@ -21,6 +21,7 @@ import '../../../models/responses/auth/country_response.dart';
 import '../../../models/webview_data_model.dart';
 import '../../../viewmodels/auth/register_viewmodel.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../data/repository/app_repository.dart';
 import '../../../features/at_ai_driver/data/pending_ai_driver_documents.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -404,6 +405,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(registerViewModelProvider);
     final colors = context.colors;
+
+    if (_firstNameController.text != state.firstName) {
+      _firstNameController.text = state.firstName;
+    }
+    if (_lastNameController.text != state.lastName) {
+      _lastNameController.text = state.lastName;
+    }
+    if (_emailController.text != state.email) {
+      _emailController.text = state.email;
+    }
+    if (_phoneController.text != state.phoneNumber) {
+      _phoneController.text = state.phoneNumber;
+    }
+    if (_passwordController.text != state.password) {
+      _passwordController.text = state.password;
+    }
+    if (_drivingLicenseController.text != state.drivingLicense) {
+      _drivingLicenseController.text = state.drivingLicense;
+    }
 
     return AppScaffold(
       body: SafeArea(

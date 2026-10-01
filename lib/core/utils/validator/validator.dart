@@ -100,11 +100,15 @@ class Validator {
   }
 
   static ValidationResult validPhoneNumberFormat(String phoneNumber) {
-    return ValidationResult(phoneNumber.isNotEmpty && phoneNumber.isValidPhoneNumber());
+    return ValidationResult(
+      phoneNumber.isNotEmpty && phoneNumber.isValidPhoneNumber(),
+    );
   }
 
   static ValidationResult validPhoneNumberFormatForLogin(String phoneNumber) {
-    return ValidationResult(phoneNumber.isNotEmpty && phoneNumber.isValidPhoneNumberForLogin());
+    return ValidationResult(
+      phoneNumber.isNotEmpty && phoneNumber.isValidPhoneNumberForLogin(),
+    );
   }
 
   static ValidationResult validPassword(String password) {
@@ -131,11 +135,14 @@ class Validator {
 /// String extension methods for validation
 extension StringValidation on String {
   bool isValidName() {
-    return isNotEmpty && trim().split('').every((char) => RegExp(r'[a-zA-Z]').hasMatch(char));
+    return isNotEmpty &&
+        trim().split('').every((char) => RegExp(r'[a-zA-Z]').hasMatch(char));
   }
 
   bool isValidEmail() {
-    final emailPattern = RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,64}');
+    final emailPattern = RegExp(
+      r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,64}',
+    );
     return isNotEmpty && emailPattern.hasMatch(this);
   }
 
@@ -147,9 +154,11 @@ extension StringValidation on String {
   }
 
   bool isValidPhoneNumberForLogin() {
+    final minLength = ValidatorConfig.phoneNumberMinLength;
+    final maxLength = ValidatorConfig.phoneNumberMaxLength;
     return isNotEmpty &&
-        length >= 6 &&
-        length <= 12 &&
+        length >= minLength &&
+        length <= maxLength &&
         split('').every((char) => RegExp(r'[0-9]').hasMatch(char));
   }
 
@@ -187,7 +196,9 @@ extension StringValidation on String {
     }
 
     if (rules?.requireSpecial ?? false) {
-      final specialCharRegex = RegExp(r'''[!"#\$%&'()*+,\-./:;<=>?@\[\]^_`{|}~]''');
+      final specialCharRegex = RegExp(
+        r'''[!"#\$%&'()*+,\-./:;<=>?@\[\]^_`{|}~]''',
+      );
       if (!specialCharRegex.hasMatch(this)) {
         errors.add('at least one special character');
       }

@@ -579,6 +579,25 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
     switch (signInResponse) {
       case Success():
+        final hasAuthorizationHeader =
+            signInResponse.header?.authorization?.trim().isNotEmpty == true;
+        final hasSavedToken = _sharedPref.hasAuthorizationToken();
+
+        debugPrint(
+          'Core signin response authorization header: ${hasAuthorizationHeader ? 'есть' : 'нет'}',
+        );
+        debugPrint(
+          'Core signin saved token after response: ${hasSavedToken ? 'есть' : 'нет'}',
+        );
+
+        if (!hasAuthorizationHeader || !hasSavedToken) {
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Sign in failed: authorization token not saved',
+          );
+          return false;
+        }
+
         await _fetchEntityDetail(
           _sharedPref.getEntity()?.countryCode ??
               DeviceInfoHelper.getDeviceCountry(),
@@ -615,6 +634,25 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
     switch (signUpResponse) {
       case Success():
+        final hasAuthorizationHeader =
+            signUpResponse.header?.authorization?.trim().isNotEmpty == true;
+        final hasSavedToken = _sharedPref.hasAuthorizationToken();
+
+        debugPrint(
+          'Core signin response authorization header: ${hasAuthorizationHeader ? 'есть' : 'нет'}',
+        );
+        debugPrint(
+          'Core signin saved token after response: ${hasSavedToken ? 'есть' : 'нет'}',
+        );
+
+        if (!hasAuthorizationHeader || !hasSavedToken) {
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Sign up failed: authorization token not saved',
+          );
+          return false;
+        }
+
         await _fetchEntityDetail(
           _sharedPref.getEntity()?.countryCode ??
               DeviceInfoHelper.getDeviceCountry(),
