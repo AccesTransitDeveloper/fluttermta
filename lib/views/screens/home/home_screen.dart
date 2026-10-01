@@ -16,6 +16,7 @@ import '../../../data/api/response_state.dart';
 import '../../../data/api/server_config.dart';
 import '../../../data/api/mta_api.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../data/repository/app_repository.dart';
 import '../../../models/responses/home/information_status_response.dart';
 import '../../../viewmodels/settings_viewmodel.dart';
 import '../../widgets/mta_consent_dialog.dart';

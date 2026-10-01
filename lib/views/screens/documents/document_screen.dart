@@ -14,6 +14,7 @@ import '../../../viewmodels/home_viewmodel.dart';
 import '../../../core/constants/app_constants.dart' show VehicleStatus;
 import '../../../core/providers/app_providers.dart';
 import '../../../data/api/response_state.dart';
+import '../../../data/repository/app_repository.dart';
 import '../../../features/at_ai_driver/data/pending_ai_driver_documents.dart';
 import '../../../models/responses/home/information_status_response.dart';
 import '../../bottomsheets/document_edit_bottom_sheet.dart';

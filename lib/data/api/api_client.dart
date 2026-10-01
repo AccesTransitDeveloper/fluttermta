@@ -61,7 +61,7 @@ class ApiClient {
         duration: duration,
       );
 
-      return _handleResponse<T>(response, fromJsonT);
+      return await _handleResponse<T>(response, fromJsonT);
     } on SocketException catch (e) {
       final duration = DateTime.now().difference(startTime);
 
@@ -125,7 +125,7 @@ class ApiClient {
         duration: duration,
       );
 
-      return _handleResponse<T>(response, fromJsonT);
+      return await _handleResponse<T>(response, fromJsonT);
     } on SocketException catch (e) {
       final duration = DateTime.now().difference(startTime);
 
@@ -189,7 +189,7 @@ class ApiClient {
         duration: duration,
       );
 
-      return _handleResponse<T>(response, fromJsonT);
+      return await _handleResponse<T>(response, fromJsonT);
     } on SocketException catch (e) {
       final duration = DateTime.now().difference(startTime);
 
@@ -253,7 +253,7 @@ class ApiClient {
         duration: duration,
       );
 
-      return _handleResponse<T>(response, fromJsonT);
+      return await _handleResponse<T>(response, fromJsonT);
     } on SocketException catch (e) {
       final duration = DateTime.now().difference(startTime);
 
@@ -314,7 +314,7 @@ class ApiClient {
         duration: duration,
       );
 
-      return _handleResponse<T>(response, fromJsonT);
+      return await _handleResponse<T>(response, fromJsonT);
     } on SocketException catch (e) {
       final duration = DateTime.now().difference(startTime);
 
@@ -344,10 +344,10 @@ class ApiClient {
     }
   }
 
-  ResponseState<T> _handleResponse<T>(
+  Future<ResponseState<T>> _handleResponse<T>(
     http.Response response,
     T Function(dynamic)? fromJsonT,
-  ) {
+  ) async {
     try {
       final jsonData =
           response.body.isNotEmpty ? jsonDecode(response.body) : null;
@@ -369,7 +369,7 @@ class ApiClient {
 
       // Automatically save authorization token if present in response headers
       if (authorization != null && authorization.isNotEmpty) {
-        _headerInterceptor.updateAuthToken(authorization);
+        await _headerInterceptor.updateAuthToken(authorization);
       }
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -487,7 +487,7 @@ class ApiClient {
         duration: duration,
       );
 
-      return _handleResponse<T>(response, fromJsonT);
+      return await _handleResponse<T>(response, fromJsonT);
     } on SocketException catch (e) {
       final duration = DateTime.now().difference(startTime);
 

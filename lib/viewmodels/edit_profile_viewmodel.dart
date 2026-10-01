@@ -102,7 +102,10 @@ class EditProfileState {
   bool get isFirstNameValid => firstName.isNotEmpty;
   bool get isLastNameValid => lastName.isNotEmpty;
   bool get isNameValid => isFirstNameValid && isLastNameValid;
-  bool get isPhoneValid => phoneNumber.isNotEmpty && phoneNumber.length >= 6;
+  bool get isPhoneValid =>
+      phoneNumber.isNotEmpty &&
+      phoneNumber.length >= ValidatorConfig.phoneNumberMinLength &&
+      phoneNumber.length <= ValidatorConfig.phoneNumberMaxLength;
   bool get isEmailValid => Validator.validEmailFormat(email).status;
 
   bool get isOtpComplete => otp.length == otpLength;
@@ -112,7 +115,8 @@ class EditProfileState {
   bool get hasPhoneChanged => phoneNumber != originalPhoneNumber;
   bool get hasEmailChanged => email != originalEmail;
   bool get hasDrivingLicenseChanged => drivingLicense != originalDrivingLicense;
-  bool get isDrivingLicenseValid => Validator.validLicense(drivingLicense).status;
+  bool get isDrivingLicenseValid =>
+      Validator.validLicense(drivingLicense).status;
 
   bool get canProceed {
     switch (field) {
@@ -172,10 +176,12 @@ class EditProfileState {
       step: step ?? this.step,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
-      firstNameError:
-          clearFirstNameError ? null : (firstNameError ?? this.firstNameError),
-      lastNameError:
-          clearLastNameError ? null : (lastNameError ?? this.lastNameError),
+      firstNameError: clearFirstNameError
+          ? null
+          : (firstNameError ?? this.firstNameError),
+      lastNameError: clearLastNameError
+          ? null
+          : (lastNameError ?? this.lastNameError),
       phoneNumber: phoneNumber ?? this.phoneNumber,
       countryPhoneCode: countryPhoneCode ?? this.countryPhoneCode,
       phoneError: clearPhoneError ? null : (phoneError ?? this.phoneError),
@@ -189,8 +195,9 @@ class EditProfileState {
       otpLength: otpLength ?? this.otpLength,
       resendSeconds: resendSeconds ?? this.resendSeconds,
       countries: countries ?? this.countries,
-      selectedCountry:
-          selectedCountry != null ? selectedCountry() : this.selectedCountry,
+      selectedCountry: selectedCountry != null
+          ? selectedCountry()
+          : this.selectedCountry,
       isPhoneVerificationEnabled:
           isPhoneVerificationEnabled ?? this.isPhoneVerificationEnabled,
       isEmailVerificationEnabled:
@@ -211,7 +218,7 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
   final SharedPreferenceManager _sharedPref;
 
   EditProfileViewModel(this._appRepository, this._sharedPref)
-      : super(EditProfileState());
+    : super(EditProfileState());
 
   void init(EditProfileField field) {
     final entity = _sharedPref.getEntity();
@@ -260,9 +267,9 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
         Country? matched;
         if (currentPhoneCode.isNotEmpty && countries.isNotEmpty) {
           matched = countries.cast<Country?>().firstWhere(
-                (c) => c?.displayPhoneCode == currentPhoneCode,
-                orElse: () => null,
-              );
+            (c) => c?.displayPhoneCode == currentPhoneCode,
+            orElse: () => null,
+          );
         }
         state = state.copyWith(
           countries: countries,
@@ -284,17 +291,26 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
 
   void setFirstName(String value) {
     state = state.copyWith(
-        firstName: value, clearFirstNameError: true, clearError: true);
+      firstName: value,
+      clearFirstNameError: true,
+      clearError: true,
+    );
   }
 
   void setLastName(String value) {
     state = state.copyWith(
-        lastName: value, clearLastNameError: true, clearError: true);
+      lastName: value,
+      clearLastNameError: true,
+      clearError: true,
+    );
   }
 
   void setPhoneNumber(String value) {
     state = state.copyWith(
-        phoneNumber: value, clearPhoneError: true, clearError: true);
+      phoneNumber: value,
+      clearPhoneError: true,
+      clearError: true,
+    );
   }
 
   void setDrivingLicense(String value) {
@@ -306,8 +322,11 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
   }
 
   void setEmail(String value) {
-    state =
-        state.copyWith(email: value, clearEmailError: true, clearError: true);
+    state = state.copyWith(
+      email: value,
+      clearEmailError: true,
+      clearError: true,
+    );
   }
 
   void setOtp(String value) {
@@ -320,8 +339,11 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
 
   void goBack() {
     if (state.step == EditProfileStep.otp) {
-      state =
-          state.copyWith(step: EditProfileStep.input, otp: '', clearError: true);
+      state = state.copyWith(
+        step: EditProfileStep.input,
+        otp: '',
+        clearError: true,
+      );
     }
   }
 
@@ -343,7 +365,9 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
     if (!Validator.validLicense(state.drivingLicense).status) {
       state = state.copyWith(
         drivingLicenseError: getString(
-            appStr.errorPleaseAddLicense, 'error_please_add_license'),
+          appStr.errorPleaseAddLicense,
+          'error_please_add_license',
+        ),
       );
       return false;
     }
@@ -355,15 +379,19 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
   Future<bool> _updateName() async {
     if (!Validator.validFirstName(state.firstName).status) {
       state = state.copyWith(
-        firstNameError: getString(appStr.errorPleaseEnterValidFirstName,
-            'error_please_enter_valid_first_name'),
+        firstNameError: getString(
+          appStr.errorPleaseEnterValidFirstName,
+          'error_please_enter_valid_first_name',
+        ),
       );
       return false;
     }
     if (!Validator.validLastName(state.lastName).status) {
       state = state.copyWith(
-        lastNameError: getString(appStr.errorPleaseEnterValidLastName,
-            'error_please_enter_valid_last_name'),
+        lastNameError: getString(
+          appStr.errorPleaseEnterValidLastName,
+          'error_please_enter_valid_last_name',
+        ),
       );
       return false;
     }
@@ -375,15 +403,19 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
     if (state.step == EditProfileStep.input) {
       if (!Validator.validPhoneNumber(state.phoneNumber).status) {
         state = state.copyWith(
-          phoneError: getString(appStr.errorPleaseEnterPhoneNumber,
-              'error_please_enter_phone_number'),
+          phoneError: getString(
+            appStr.errorPleaseEnterPhoneNumber,
+            'error_please_enter_phone_number',
+          ),
         );
         return false;
       }
       if (!Validator.validPhoneNumberFormatForLogin(state.phoneNumber).status) {
         state = state.copyWith(
-          phoneError: getString(appStr.errorPleaseEnterValidPhoneNumber,
-              'error_please_enter_valid_phone_number'),
+          phoneError: getString(
+            appStr.errorPleaseEnterValidPhoneNumber,
+            'error_please_enter_valid_phone_number',
+          ),
         );
         return false;
       }
@@ -407,14 +439,18 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
       if (!Validator.validEmail(state.email).status) {
         state = state.copyWith(
           emailError: getString(
-              appStr.errorPleaseEnterEmail, 'error_please_enter_email'),
+            appStr.errorPleaseEnterEmail,
+            'error_please_enter_email',
+          ),
         );
         return false;
       }
       if (!Validator.validEmailFormat(state.email).status) {
         state = state.copyWith(
-          emailError: getString(appStr.errorPleaseEnterValidEmail,
-              'error_please_enter_valid_email'),
+          emailError: getString(
+            appStr.errorPleaseEnterValidEmail,
+            'error_please_enter_valid_email',
+          ),
         );
         return false;
       }
@@ -447,8 +483,9 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
         return true;
       case Error():
         state = state.copyWith(
-            isLoading: false,
-            error: response.error?.message ?? '');
+          isLoading: false,
+          error: response.error?.message ?? '',
+        );
         return false;
       case Loading():
         return false;
@@ -468,8 +505,9 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
         return true;
       case Error():
         state = state.copyWith(
-            isLoading: false,
-            error: response.error?.message ?? '');
+          isLoading: false,
+          error: response.error?.message ?? '',
+        );
         return false;
       case Loading():
         return false;
@@ -490,10 +528,12 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
 
   Future<bool> _updatePhoneWithOtp() async {
     state = state.copyWith(isLoading: true, clearError: true);
-    return await _callUpdateProfile(_buildUpdateProfileRequest(
-      enteredOTP: state.otp,
-      sendTo: OtpSendMode.sms,
-    ));
+    return await _callUpdateProfile(
+      _buildUpdateProfileRequest(
+        enteredOTP: state.otp,
+        sendTo: OtpSendMode.sms,
+      ),
+    );
   }
 
   Future<bool> _updateEmailDirectly() async {
@@ -503,11 +543,13 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
 
   Future<bool> _updateEmailWithOtp() async {
     state = state.copyWith(isLoading: true, clearError: true);
-    return await _callUpdateProfile(_buildUpdateProfileRequest(
-      enteredOTP: state.otp,
-      enteredOTPMail: state.otp,
-      sendTo: OtpSendMode.email,
-    ));
+    return await _callUpdateProfile(
+      _buildUpdateProfileRequest(
+        enteredOTP: state.otp,
+        enteredOTPMail: state.otp,
+        sendTo: OtpSendMode.email,
+      ),
+    );
   }
 
   /// Native sends the **complete** profile payload on every update_profile
@@ -550,8 +592,9 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
         return true;
       case Error():
         state = state.copyWith(
-            isLoading: false,
-            error: response.error?.message ?? '');
+          isLoading: false,
+          error: response.error?.message ?? '',
+        );
         return false;
       case Loading():
         return false;
@@ -575,12 +618,15 @@ class EditProfileViewModel extends StateNotifier<EditProfileState> {
 }
 
 final editProfileViewModelProvider =
-    StateNotifierProvider.autoDispose<EditProfileViewModel, EditProfileState>(
-        (ref) {
-  final appRepository = ref.watch(appRepositoryProvider);
-  final sharedPref = ref.watch(sharedPreferenceManagerProvider).maybeWhen(
-        data: (data) => data,
-        orElse: () => throw Exception('SharedPreferences not initialized'),
-      );
-  return EditProfileViewModel(appRepository, sharedPref);
-});
+    StateNotifierProvider.autoDispose<EditProfileViewModel, EditProfileState>((
+      ref,
+    ) {
+      final appRepository = ref.watch(appRepositoryProvider);
+      final sharedPref = ref
+          .watch(sharedPreferenceManagerProvider)
+          .maybeWhen(
+            data: (data) => data,
+            orElse: () => throw Exception('SharedPreferences not initialized'),
+          );
+      return EditProfileViewModel(appRepository, sharedPref);
+    });

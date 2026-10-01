@@ -5,6 +5,7 @@ import 'package:driver/core/interceptors/base_url_interceptor.dart';
 import 'package:driver/core/interceptors/header_interceptor.dart';
 import 'package:driver/core/interceptors/logging_interceptor.dart';
 import 'package:driver/core/preferences/shared_preference_manager.dart';
+import 'package:driver/core/utils/validator/validator.dart';
 import 'package:driver/data/api/api_client.dart';
 import 'package:driver/data/api/response_state.dart';
 import 'package:driver/data/repository/app_repository.dart';
@@ -90,6 +91,16 @@ class _RetryRepository extends AppRepository {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('uses the server phone length rules for login validation', () {
+    ValidatorConfig.phoneNumberMinLength = 8;
+    ValidatorConfig.phoneNumberMaxLength = 10;
+
+    expect('1234567'.isValidPhoneNumberForLogin(), isFalse);
+    expect('12345678'.isValidPhoneNumberForLogin(), isTrue);
+    expect('1234567890'.isValidPhoneNumberForLogin(), isTrue);
+    expect('12345678901'.isValidPhoneNumberForLogin(), isFalse);
+  });
 
   test('collects only document IDs that have a file to upload', () {
     final draft = AiDriverRegistrationDraft.create().copyWith(

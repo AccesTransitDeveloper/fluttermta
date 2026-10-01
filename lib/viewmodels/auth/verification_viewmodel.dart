@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repository/app_repository.dart';
 import '../../data/api/response_state.dart';
@@ -453,6 +454,25 @@ class VerificationViewModel extends StateNotifier<VerificationState> {
 
     switch (response) {
       case Success():
+        final hasAuthorizationHeader =
+            response.header?.authorization?.trim().isNotEmpty == true;
+        final hasSavedToken = _sharedPref.hasAuthorizationToken();
+
+        debugPrint(
+          'Core signin response authorization header: ${hasAuthorizationHeader ? 'есть' : 'нет'}',
+        );
+        debugPrint(
+          'Core signin saved token after response: ${hasSavedToken ? 'есть' : 'нет'}',
+        );
+
+        if (!hasAuthorizationHeader || !hasSavedToken) {
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Sign in failed: authorization token not saved',
+          );
+          return false;
+        }
+
         await _fetchEntityDetail();
         await _sharedPref.setLoggedIn(true);
         _subscribeMassNotificationTopics();

@@ -26,8 +26,8 @@ class HeaderInterceptor {
     return headers;
   }
 
-  void updateAuthToken(String token) {
-    _sharedPreferenceManager.setAuthorization(token);
+  Future<void> updateAuthToken(String token) async {
+    await _sharedPreferenceManager.setAuthorization(token);
   }
 
   void removeAuthToken() {

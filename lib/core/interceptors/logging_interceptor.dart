@@ -1,6 +1,7 @@
-/// API logger. Prints only a clean cURL command per request (no bodies, no
-/// responses) so the console stays readable. Output goes through `print()` so
-/// it shows in the `flutter:` console, chunked so long cURLs aren't truncated.
+/// API logger. Prints a clean cURL command per request plus the response
+/// status and body, so failures (e.g. rejected sign-ups) are visible. Output
+/// goes through `print()` so it shows in the `flutter:` console, chunked so
+/// long payloads aren't truncated.
 class LoggingInterceptor {
   void logRequest({
     required String method,
@@ -17,14 +18,21 @@ class LoggingInterceptor {
     _printChunked('\n🧾 $method  ${_shortUrl(url)}\n$curl');
   }
 
-  // Response logging is disabled — only the request cURL is printed.
   void logResponse({
     required String method,
     required String url,
     required int statusCode,
     required String? responseBody,
     required Duration duration,
-  }) {}
+  }) {
+    final body = (responseBody == null || responseBody.isEmpty)
+        ? '<empty>'
+        : responseBody;
+    _printChunked(
+      '\n📥 $method  ${_shortUrl(url)}  →  $statusCode '
+      '(${duration.inMilliseconds}ms)\n$body',
+    );
+  }
 
   void logError({
     required String method,

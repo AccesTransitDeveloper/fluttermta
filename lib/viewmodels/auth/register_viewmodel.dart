@@ -156,7 +156,10 @@ class RegisterState {
   bool get isLastNameValid => lastName.isNotEmpty;
   bool get isNameValid => isFirstNameValid && isLastNameValid;
 
-  bool get isPhoneValid => phoneNumber.isNotEmpty && phoneNumber.length >= 6;
+  bool get isPhoneValid =>
+      phoneNumber.isNotEmpty &&
+      phoneNumber.length >= ValidatorConfig.phoneNumberMinLength &&
+      phoneNumber.length <= ValidatorConfig.phoneNumberMaxLength;
 
   bool get isPasswordValid => password.isNotEmpty;
 
@@ -172,8 +175,9 @@ class RegisterState {
       case RegisterStep.terms:
         return termsAccepted;
       case RegisterStep.contact:
-        if (origin == RegisterOrigin.phone)
+        if (origin == RegisterOrigin.phone) {
           return email.isNotEmpty && selectedCity != null;
+        }
         return phoneNumber.isNotEmpty && selectedCity != null;
       case RegisterStep.password:
         return isPasswordValid;
@@ -940,6 +944,20 @@ class RegisterViewModel extends StateNotifier<RegisterState> {
     }
   }
 
+  String _normalizeSignUpErrorMessage(String? serverMessage) {
+    final message = (serverMessage ?? '').trim();
+    if (message.isEmpty) return 'Sign up failed';
+
+    final lower = message.toLowerCase();
+    if (lower.contains('driving license not found')) {
+      return 'Driving license not found in Core. Please verify the license number and try again.';
+    }
+    if (lower.contains('regex failed for \'phone\'')) {
+      return 'Phone number format is invalid for this environment.';
+    }
+    return message;
+  }
+
   Future<bool> _signUp() async {
     final phoneCode = state.origin == RegisterOrigin.phone
         ? state.countryPhoneCode
@@ -983,9 +1001,18 @@ class RegisterViewModel extends StateNotifier<RegisterState> {
         state = state.copyWith(isLoading: false, isSignUpSuccess: true);
         return true;
       case Error():
+        final normalizedMessage = _normalizeSignUpErrorMessage(
+          response.error?.message,
+        );
+        final isDrivingLicenseIssue = normalizedMessage.toLowerCase().contains(
+          'driving license not found',
+        );
         state = state.copyWith(
           isLoading: false,
-          error: response.error?.message ?? 'Sign up failed',
+          error: normalizedMessage,
+          drivingLicenseError: isDrivingLicenseIssue
+              ? normalizedMessage
+              : state.drivingLicenseError,
         );
         return false;
       case Loading():
