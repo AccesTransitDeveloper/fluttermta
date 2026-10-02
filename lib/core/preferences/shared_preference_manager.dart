@@ -79,6 +79,44 @@ class SharedPreferenceManager {
     return _prefs.setBool(SharedPreferencesConstants.isLoggedIn, value);
   }
 
+  bool get hasPendingHostedOnboarding {
+    final entity = getEntity();
+    if (entity == null || entity.id == null) return false;
+    if (_prefs.getString('hosted_onboarding_pending_account') == entity.id) {
+      return true;
+    }
+    final email = _prefs.getString('hosted_onboarding_pending_email');
+    final phone = _prefs.getString('hosted_onboarding_pending_phone');
+    return (email != null && entity.email?.trim().toLowerCase() == email) ||
+        (phone != null && entity.phone?.trim() == phone);
+  }
+
+  /// Remember a confirmed signup even if fetching its profile requires sign-in.
+  /// This is a resume hint, never an authenticated account ID.
+  Future<void> requireHostedOnboardingForSignup({String? email, String? phone}) async {
+    await _prefs.remove('hosted_onboarding_pending_email');
+    await _prefs.remove('hosted_onboarding_pending_phone');
+    if (email?.trim().isNotEmpty == true) {
+      await _prefs.setString('hosted_onboarding_pending_email', email!.trim().toLowerCase());
+    }
+    if (phone?.trim().isNotEmpty == true) {
+      await _prefs.setString('hosted_onboarding_pending_phone', phone!.trim());
+    }
+  }
+
+  Future<void> requireHostedOnboarding(String accountId) async {
+    await _prefs.setString('hosted_onboarding_pending_account', accountId);
+  }
+
+  Future<void> completeHostedOnboarding(String accountId, String crmId) async {
+    await _prefs.setString('hosted_onboarding_crm_$accountId', crmId);
+    if (_prefs.getString('hosted_onboarding_pending_account') == accountId) {
+      await _prefs.remove('hosted_onboarding_pending_account');
+      await _prefs.remove('hosted_onboarding_pending_email');
+      await _prefs.remove('hosted_onboarding_pending_phone');
+    }
+  }
+
   // Language
   String getLanguage() {
     return _prefs.getString(SharedPreferencesConstants.language) ?? 'en';

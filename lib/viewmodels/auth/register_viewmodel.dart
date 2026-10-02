@@ -994,7 +994,11 @@ class RegisterViewModel extends StateNotifier<RegisterState> {
       case Success():
         final hasNewBearer = response.header?.authorization?.isNotEmpty == true;
         await _sharedPref.setLoggedIn(hasNewBearer);
-        if (hasNewBearer && countryCode != null) {
+        await _sharedPref.requireHostedOnboardingForSignup(
+          email: state.origin == RegisterOrigin.email ? state.email : null,
+          phone: state.origin == RegisterOrigin.phone ? state.phoneNumber : null,
+        );
+        if (hasNewBearer) {
           await _fetchEntityDetailAfterSignUp(countryCode);
         }
         if (hasNewBearer) _subscribeMassNotificationTopics();
@@ -1020,7 +1024,7 @@ class RegisterViewModel extends StateNotifier<RegisterState> {
     }
   }
 
-  Future<void> _fetchEntityDetailAfterSignUp(String countryCode) async {
+  Future<void> _fetchEntityDetailAfterSignUp(String? countryCode) async {
     final request = EntityDetailRequest(countryCode: countryCode);
     final response = await _appRepository.getEntityDetail(request);
 

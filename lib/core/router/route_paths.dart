@@ -7,7 +7,7 @@ class RoutePaths {
   static const String login = '/login';
   static const String verification = '/verification';
   static const String register = '/register';
-  static const String atAiDriver = '/at-ai-driver';
+  static const String driverOnboarding = '/driver-onboarding';
   static const String forgotPassword = '/forgot-password';
   static const String createPassword = '/create-password';
 

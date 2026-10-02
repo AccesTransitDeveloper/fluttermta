@@ -21,8 +21,6 @@ import '../../../models/responses/auth/country_response.dart';
 import '../../../models/webview_data_model.dart';
 import '../../../viewmodels/auth/register_viewmodel.dart';
 import '../../../core/providers/app_providers.dart';
-import '../../../data/repository/app_repository.dart';
-import '../../../features/at_ai_driver/data/pending_ai_driver_documents.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final RegisterOrigin origin;
@@ -296,9 +294,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           builder: (context) => AlertDialog(
             title: const Text('Core account created'),
             content: const Text(
-              'Sign in to your new account before sending documents. '
-              'Your AT AI Driver files are saved on this device; open Documents '
-              'after signing in to resume.',
+              'Sign in to your new account to continue registration. '
+              'The hosted document checklist will open after sign-in.',
             ),
             actions: [
               TextButton(
@@ -311,50 +308,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (mounted) context.navigateToLogin();
         return;
       }
-      try {
-        final pending = await PendingAiDriverDocuments.forEntity(entity!);
-        if (pending != null && pending.hasPendingFiles) {
-          await pending.submit(ref.read(appRepositoryProvider), preferences);
-          if (!mounted) return;
-          await showDialog<void>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Documents sent to Core'),
-              content: const Text(
-                'Your files were received by Core. Their review is not yet '
-                'complete; check Documents for approval or rejection.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Continue'),
-                ),
-              ],
-            ),
-          );
-        }
-      } catch (error) {
-        if (!mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Account created; documents need attention'),
-            content: Text(
-              '${error is StateError ? error.message : 'Could not submit your documents.'}\n\n'
-              'Files are saved on this device. Open Documents to review and retry; '
-              'do not register again.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Continue'),
-              ),
-            ],
-          ),
-        );
-      }
+      await preferences.requireHostedOnboarding(entity!.id!);
       if (!mounted) return;
-      context.navigateToHome();
+      context.navigateToDriverOnboarding();
     }
   }
 

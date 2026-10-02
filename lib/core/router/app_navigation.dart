@@ -23,6 +23,7 @@ extension AppNavigation on BuildContext {
   // ── Auth (use go() to replace stack) ────────────────
   void navigateToLogin() => go(RoutePaths.login);
   void navigateToHome() => go(RoutePaths.home);
+  void navigateToDriverOnboarding() => go(RoutePaths.driverOnboarding);
   void navigateToAtAiDriver({
     bool startFresh = false,
     RegisterOrigin? origin,
@@ -31,18 +32,15 @@ extension AppNavigation on BuildContext {
     String? email,
     List<Country> countries = const [],
     Country? selectedCountry,
-  }) => go(
-    RoutePaths.atAiDriver,
-    extra: {
-      'startFresh': startFresh,
-      'origin': origin == RegisterOrigin.email ? 'email' : 'phone',
-      'phoneNumber': phoneNumber,
-      'countryPhoneCode': countryPhoneCode,
-      'email': email,
-      'countries': countries,
-      'selectedCountry': selectedCountry,
-    },
-  );
+  }) {
+    // Account creation stays native and precedes hosted document collection.
+    if (origin == RegisterOrigin.email) {
+      navigateToRegisterEmail(email: email ?? '', countries: countries, selectedCountry: selectedCountry);
+    } else {
+      navigateToRegisterPhone(phoneNumber: phoneNumber ?? '', countryPhoneCode: countryPhoneCode ?? '',
+        countries: countries, selectedCountry: selectedCountry);
+    }
+  }
 
   // ── Auth Flow ───────────────────────────────────────
   void navigateToVerificationPhone({

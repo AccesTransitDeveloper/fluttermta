@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'route_paths.dart';
 import 'app_route_observer.dart';
+import '../providers/app_providers.dart';
 
 import '../../views/screens/splash/splash_screen.dart';
 import '../../views/screens/auth/login_screen.dart';
@@ -54,7 +55,7 @@ import '../../views/screens/receipt/receipt_screen.dart';
 import '../../viewmodels/receipt_viewmodel.dart';
 import '../../views/screens/feedback/feedback_screen.dart';
 import '../../views/screens/create_request/create_request_screen.dart';
-import '../../features/at_ai_driver/presentation/at_ai_driver_screen.dart';
+import '../../features/driver_onboarding/hosted_onboarding_screen.dart';
 import '../../viewmodels/auth/register_viewmodel.dart';
 
 /// Temporary placeholder widget used until actual screens are built.
@@ -143,21 +144,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: RoutePaths.atAiDriver,
-        builder: (context, state) {
-          final params = state.extra as Map<String, dynamic>?;
-          return AtAiDriverScreen(
-            startFresh: params?['startFresh'] as bool? ?? false,
-            origin: params?['origin'] == 'email'
-                ? RegisterOrigin.email
-                : RegisterOrigin.phone,
-            phoneNumber: params?['phoneNumber'] as String?,
-            countryPhoneCode: params?['countryPhoneCode'] as String?,
-            email: params?['email'] as String?,
-            countries: (params?['countries'] as List<Country>?) ?? const [],
-            selectedCountry: params?['selectedCountry'] as Country?,
-          );
-        },
+        path: RoutePaths.driverOnboarding,
+        builder: (context, state) => const HostedOnboardingScreen(),
       ),
       GoRoute(
         path: RoutePaths.forgotPassword,
@@ -191,6 +179,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // ── Main (bottom nav) ─────────────────────────────
       GoRoute(
         path: RoutePaths.home,
+        redirect: (context, state) async {
+          final preferences = await ref.read(sharedPreferenceManagerProvider.future);
+          return preferences.hasPendingHostedOnboarding ? RoutePaths.driverOnboarding : null;
+        },
         builder: (context, state) => const HomeScreen(),
       ),
 
