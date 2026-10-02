@@ -21,6 +21,7 @@ class _HostedOnboardingState extends ConsumerState<HostedOnboardingScreen>
     with WidgetsBindingObserver {
   static final _origin = Uri.parse('https://fashnmall.com');
   static final _page = _origin.resolve('/at-driver-web/onboarding');
+  static final _api = _origin.resolve('/at-driver-web/onboarding/api/');
   SharedPreferenceManager? _preferences;
   InAppWebViewController? _controller;
   String? _accountId;
@@ -48,7 +49,7 @@ class _HostedOnboardingState extends ConsumerState<HostedOnboardingScreen>
       throw StateError('Sign in to your driver account to continue.');
     }
     final response = await http.post(
-      _origin.resolve('/api/driver-onboarding/$path'),
+      _api.resolve(path),
       headers: {'Authorization': authorization, 'Content-Type': 'application/json'},
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 40));
@@ -60,12 +61,33 @@ class _HostedOnboardingState extends ConsumerState<HostedOnboardingScreen>
     return result;
   }
 
+  Future<void> _checkService() async {
+    final response = await http.get(_api.resolve('health'),
+      headers: {'Cache-Control': 'no-cache'},
+    ).timeout(const Duration(seconds: 20));
+    Map<String, dynamic>? health;
+    try {
+      final result = jsonDecode(response.body);
+      if (result is Map<String, dynamic>) health = result;
+    } catch (_) {
+      // An unpublished API may return the web page rather than JSON.
+    }
+    if (response.statusCode != 200 || health?['ok'] != true ||
+        health?['service'] != 'at-driver-onboarding' || health?['protocolVersion'] != 1) {
+      throw StateError('The registration service must be published at this address. This is a server error, not a sign-in error. Contact support.');
+    }
+    if (health?['crmConfigured'] != true || health?['databaseConfigured'] != true) {
+      throw StateError('The registration server is missing required configuration. Contact support.');
+    }
+  }
+
   Future<void> _prepare() async {
     final generation = ++_generation;
     setState(() { _loading = true; _error = null; _handoffToken = null; });
     try {
       final preferences = await ref.read(sharedPreferenceManagerProvider.future);
       _preferences = preferences;
+      await _checkService();
       // Resolve identity from a server-verified account, never a generated ID.
       final status = await _post('account-status', {});
       final id = status['accountId'];

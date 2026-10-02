@@ -55,11 +55,21 @@ including after a signup requiring a separate sign-in.
 
 **This repository update does not deploy the website or its backend.** Before
 using the new registration flow, publish the updated onboarding page and its
-dedicated `/api/driver-onboarding` service on `fashnmall.com`. The service is in
+dedicated `/at-driver-web/onboarding/api` service on `fashnmall.com`. The original
+`/api/driver-onboarding` route remains supported for existing app releases.
+The service is in
 the web workspace at `artifacts/at-driver-web/server-entry.ts`; it requires
 server-only `DATABASE_URL` and `DRIVER_APPLICATION_API_KEY`. Until that protocol
 is deployed, registration may report that the service is unavailable. Never
 place the CRM key in Flutter or bypass server verification.
+
+The visible registration URL remains exactly
+`https://fashnmall.com/at-driver-web/onboarding`; the nested `/api` path is only
+for background requests, not an additional registration screen.
+Before a release, check the service's `/health` endpoint. It must return HTTP
+200, `service: "at-driver-onboarding"`, `protocolVersion: 1`, and both configuration
+flags as `true`. A `401 Unauthorized: no active session` at `/health`, or an HTML
+response, indicates a publication/routing problem, not a driver sign-in problem.
 
 The old native AI registration screen is removed. Existing local draft files
 are not deleted: Documents retains its authenticated Core upload/retry helpers
