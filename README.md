@@ -1,5 +1,20 @@
 # Driver app
 
+## Запуск у себя
+
+Это полный исходный код Flutter-приложения водителя: `lib`, `android`,
+`ios`, `assets`, зависимости и тесты, а не отдельный экран регистрации.
+
+**Репозиторий:** https://github.com/AccesTransitDeveloper/fluttermta — ветка `main`.
+
+Пошаговая инструкция на русском, включая настройки Firebase, карт и сборку
+Android APK: **[RUN-LOCALLY-RU.md](docs/RUN-LOCALLY-RU.md)**.
+
+Веб-регистрация и её сервер находятся отдельно в
+[Transit-Assistant-AI](https://github.com/AccesTransitDeveloper/Transit-Assistant-AI).
+Для регистрации они должны быть опубликованы по существующему адресу; переносить
+всё мобильное приложение на адрес веб-регистрации не нужно.
+
 ## Clone and run
 
 ```sh
